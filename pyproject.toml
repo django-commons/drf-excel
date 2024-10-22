@@ -43,9 +43,9 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/wharton/drf-excel/"
-"Repository" = "https://github.com/wharton/drf-excel/"
-"Documentation" = "https://github.com/wharton/drf-excel/"
+"Homepage" = "https://github.com/django-commons/drf-excel/"
+"Repository" = "https://github.com/django-commons/drf-excel/"
+"Documentation" = "https://github.com/django-commons/drf-excel/"
 
 [build-system]
 requires = ["setuptools>=67", "setuptools_scm>=7", "wheel"]
