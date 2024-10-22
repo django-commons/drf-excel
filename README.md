@@ -7,8 +7,8 @@
 [![PyPI python versions](https://img.shields.io/pypi/pyversions/drf-excel.svg)](https://pypi.python.org/pypi/drf-excel/)
 [![PyPI django versions](https://img.shields.io/pypi/djversions/drf-excel.svg)](https://pypi.org/project/drf-excel/)
 [![PyPI status](https://img.shields.io/pypi/status/drf-excel.svg)](https://pypi.python.org/pypi/drf-excel)
-[![CI](https://github.com/wharton/drf-excel/actions/workflows/test.yml/badge.svg)](https://github.com/wharton/drf-excel/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/wharton/drf-excel/graph/badge.svg?token=EETTI9XRNO)](https://codecov.io/gh/wharton/drf-excel)
+[![CI](https://github.com/django-commons/drf-excel/actions/workflows/test.yml/badge.svg)](https://github.com/django-commons/drf-excel/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/django-commons/drf-excel/graph/badge.svg?token=EETTI9XRNO)](https://codecov.io/gh/django-commons/drf-excel)
 
 `drf-excel` provides an Excel spreadsheet (xlsx) renderer for Django REST Framework. It uses OpenPyXL to create the spreadsheet and provide the file to the end user.
 
@@ -297,7 +297,7 @@ def custom_value_formatter(val):
     results: [
         {
             title: 'XLSX renderer',
-            url: 'https://github.com/wharton/drf-excel'
+            url: 'https://github.com/django-commons/drf-excel'
             returned_dict: {
                 val1: {
                     title: 'Sometimes'
@@ -338,8 +338,8 @@ xlsx_custom_mappings = {
 
 ## Release Notes and Contributors
 
-* [Release notes](https://github.com/wharton/drf-excel/releases)
-* [Our wonderful contributors](https://github.com/wharton/drf-excel/graphs/contributors)
+* [Release notes](https://github.com/django-commons/drf-excel/releases)
+* [Our wonderful contributors](https://github.com/django-commons/drf-excel/graphs/contributors)
 
 ## Maintainers
 
