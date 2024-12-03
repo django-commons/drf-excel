@@ -56,7 +56,7 @@ class XLSXField:
     def custom_mapping(self):
         if type(self.mapping) is str:
             return self.value.get(self.mapping)
-        elif callable(self.mapping):
+        if callable(self.mapping):
             return self.mapping(self.value)
         return self.value
 
@@ -89,9 +89,9 @@ class XLSXNumberField(XLSXField):
         with contextlib.suppress(Exception):
             if isinstance(self.drf_field, IntegerField) and type(value) is not int:
                 return int(value)
-            elif isinstance(self.drf_field, FloatField) and type(value) is not float:
+            if isinstance(self.drf_field, FloatField) and type(value) is not float:
                 return float(value)
-            elif (
+            if (
                 isinstance(self.drf_field, DecimalField) and type(value) is not Decimal
             ):
                 return Decimal(value)
@@ -122,7 +122,7 @@ class XLSXDateField(XLSXField):
         parsed_datetime = datetime.datetime.strptime(value, parse_format)
         if isinstance(self.drf_field, TimeField):
             return parsed_datetime.time()
-        elif isinstance(self.drf_field, DateField):
+        if isinstance(self.drf_field, DateField):
             return parsed_datetime.date()
         return parsed_datetime
 
@@ -136,12 +136,12 @@ class XLSXDateField(XLSXField):
                 return self._parse_date(
                     value, "DATETIME_FORMAT", parse_datetime
                 ).replace(tzinfo=None)
-            elif (
+            if (
                 isinstance(self.drf_field, DateField)
                 and type(value) is not datetime.date
             ):
                 return self._parse_date(value, "DATE_FORMAT", parse_date)
-            elif (
+            if (
                 isinstance(self.drf_field, TimeField)
                 and type(value) is not datetime.time
             ):
@@ -177,10 +177,9 @@ class XLSXListField(XLSXField):
         ):
             # array of array; write as json
             return json.dumps(self.value, ensure_ascii=False)
-        else:
-            # Flatten the array into a comma separated string to fit
-            # in a single spreadsheet column
-            return self.list_sep.join(map(str, self.value))
+        # Flatten the array into a comma separated string to fit
+        # in a single spreadsheet column
+        return self.list_sep.join(map(str, self.value))
 
 
 class XLSXBooleanField(XLSXField):

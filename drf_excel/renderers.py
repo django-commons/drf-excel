@@ -270,8 +270,7 @@ class XLSXRenderer(BaseRenderer):
                     if parent_label
                     else str(v.label)
                 )
-            else:
-                return False
+            return False
 
         _header_dict = {}
         _fields = serializer.get_fields()
@@ -378,11 +377,11 @@ class XLSXRenderer(BaseRenderer):
 
         if isinstance(field, BooleanField):
             return XLSXBooleanField(boolean_display=self.boolean_display, **kwargs)
-        elif isinstance(field, (IntegerField, FloatField, DecimalField)):
+        if isinstance(field, (IntegerField, FloatField, DecimalField)):
             return XLSXNumberField(**kwargs)
-        elif isinstance(field, (DateTimeField, DateField, TimeField)):
+        if isinstance(field, (DateTimeField, DateField, TimeField)):
             return XLSXDateField(**kwargs)
-        elif (
+        if (
             isinstance(field, ListField)
             or isinstance(value, Iterable)
             and not isinstance(value, str)
