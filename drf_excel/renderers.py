@@ -349,7 +349,7 @@ class XLSXRenderer(BaseRenderer):
 
         if "row_color" in row:
             last_letter = get_column_letter(column_count)
-            cell_range = self.ws[f"A{row_count}": f"{last_letter}{row_count}"]
+            cell_range = self.ws[f"A{row_count}" : f"{last_letter}{row_count}"]
             fill = PatternFill(fill_type="solid", start_color=row["row_color"])
 
             for r in cell_range:
@@ -372,7 +372,7 @@ class XLSXRenderer(BaseRenderer):
             "style": self.body_style,
             # Basically using formatter of custom col as a custom mapping
             "mapping": self.custom_cols.get(key, {}).get("formatter")
-                       or self.custom_mappings.get(key),
+            or self.custom_mappings.get(key),
             "cell_style": cell_style,
         }
 
