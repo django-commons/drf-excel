@@ -241,7 +241,7 @@ class XLSXRenderer(BaseRenderer):
 
     def _serializer_fields(self, serializer, parent_key="", key_sep="."):
         _fields_dict = {}
-        for k, v in serializer.get_fields().items():
+        for k, v in serializer.fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             if isinstance(v, Serializer):
                 _fields_dict.update(self._serializer_fields(v, new_key, key_sep))
@@ -274,7 +274,7 @@ class XLSXRenderer(BaseRenderer):
                 return False
 
         _header_dict = {}
-        _fields = serializer.get_fields()
+        _fields = serializer.fields
         for k, v in _fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             # Skip headers we want to ignore
@@ -349,7 +349,7 @@ class XLSXRenderer(BaseRenderer):
 
         if "row_color" in row:
             last_letter = get_column_letter(column_count)
-            cell_range = self.ws[f"A{row_count}" : f"{last_letter}{row_count}"]
+            cell_range = self.ws[f"A{row_count}": f"{last_letter}{row_count}"]
             fill = PatternFill(fill_type="solid", start_color=row["row_color"])
 
             for r in cell_range:
@@ -372,7 +372,7 @@ class XLSXRenderer(BaseRenderer):
             "style": self.body_style,
             # Basically using formatter of custom col as a custom mapping
             "mapping": self.custom_cols.get(key, {}).get("formatter")
-            or self.custom_mappings.get(key),
+                       or self.custom_mappings.get(key),
             "cell_style": cell_style,
         }
 
