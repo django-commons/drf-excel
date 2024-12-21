@@ -110,3 +110,19 @@ def test_secret_field_viewset(api_client, workbook_reader):
     # Check that the secret field is not included in the header or data
     assert [col.value for col in header] == ["title"]
     assert [col.value for col in data] == ["foo"]
+
+
+def test_dynamic_field_viewset(api_client, workbook_reader):
+    response = api_client.get("/dynamic-field/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+
+    header, data = list(sheet.rows)
+
+    header_values = [cell.value for cell in header]
+    assert header_values == ["field_1", "field_2", "field_99", "field_98"]
+
+    row_1_values = [cell.value for cell in data]
+    assert row_1_values == ["YUL", "CDG", "YYZ", "MAR"]

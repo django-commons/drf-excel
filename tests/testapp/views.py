@@ -1,10 +1,15 @@
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet, ViewSet, GenericViewSet
 
 from drf_excel.mixins import XLSXFileMixin
 from drf_excel.renderers import XLSXRenderer
-
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
-from .serializers import AllFieldsSerializer, ExampleSerializer, SecretFieldSerializer
+from .serializers import (
+    AllFieldsSerializer,
+    ExampleSerializer,
+    SecretFieldSerializer,
+    DynamicFieldSerializer,
+)
 
 
 class ExampleViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
@@ -26,3 +31,22 @@ class SecretFieldViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     serializer_class = SecretFieldSerializer
     renderer_classes = (XLSXRenderer,)
     filename = "secret.xlsx"
+
+
+class DynamicFieldViewSet(XLSXFileMixin, GenericViewSet):
+    serializer_class = DynamicFieldSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "dynamic_field.xlsx"
+
+    def list(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            data={
+                "field_1": "YUL",
+                "field_2": "CDG",
+                "field_55": "LHR",
+                "field_98": "MAR",
+                "field_99": "YYZ",
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)
