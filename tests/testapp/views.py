@@ -1,14 +1,15 @@
 from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet, ViewSet, GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from drf_excel.mixins import XLSXFileMixin
 from drf_excel.renderers import XLSXRenderer
+
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
 from .serializers import (
     AllFieldsSerializer,
+    DynamicFieldSerializer,
     ExampleSerializer,
     SecretFieldSerializer,
-    DynamicFieldSerializer,
 )
 
 

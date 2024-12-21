@@ -2,9 +2,9 @@ from rest_framework import routers
 
 from .testapp.views import (
     AllFieldsViewSet,
+    DynamicFieldViewSet,
     ExampleViewSet,
     SecretFieldViewSet,
-    DynamicFieldViewSet,
 )
 
 router = routers.SimpleRouter()
