@@ -241,7 +241,7 @@ class XLSXRenderer(BaseRenderer):
 
     def _serializer_fields(self, serializer, parent_key="", key_sep="."):
         _fields_dict = {}
-        for k, v in serializer.get_fields().items():
+        for k, v in serializer.fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             if isinstance(v, Serializer):
                 _fields_dict.update(self._serializer_fields(v, new_key, key_sep))
@@ -274,7 +274,7 @@ class XLSXRenderer(BaseRenderer):
                 return False
 
         _header_dict = {}
-        _fields = serializer.get_fields()
+        _fields = serializer.fields
         for k, v in _fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             # Skip headers we want to ignore

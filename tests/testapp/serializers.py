@@ -33,3 +33,15 @@ class SecretFieldSerializer(serializers.ModelSerializer):
         fields = ("title", "secret", "secret_external")
 
         extra_kwargs = {"secret": {"write_only": True}}
+
+
+class DynamicFieldSerializer(serializers.Serializer):
+    field_1 = serializers.CharField()
+    field_2 = serializers.CharField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Fields can be added dynamically
+        self.fields["field_99"] = serializers.CharField()
+        self.fields["field_98"] = serializers.CharField()
