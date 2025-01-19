@@ -33,7 +33,7 @@ dependencies = [
     "openpyxl>=2.4",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
   "django-coverage-plugin",
   "ipython",
