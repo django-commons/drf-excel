@@ -51,3 +51,11 @@ class DynamicFieldViewSet(XLSXFileMixin, GenericViewSet):
         )
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
+
+
+class AutoFilterViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+
+    xlsx_auto_filter = True

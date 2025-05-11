@@ -94,6 +94,9 @@ class XLSXRenderer(BaseRenderer):
         # Make column headers
         column_titles = column_header.get("titles", [])
 
+        # Check for auto_filter
+        auto_filter = get_attribute(drf_view, 'xlsx_auto_filter', False)
+
         # If we have results, then flatten field names
         if len(results):
             # Set `xlsx_use_labels = True` inside the API View to enable labels.
@@ -215,6 +218,11 @@ class XLSXRenderer(BaseRenderer):
             for row in results:
                 self._make_body(body, row, row_count)
                 row_count += 1
+
+        # Enable auto filters if requested
+        if auto_filter and column_count:
+            self.ws.auto_filter.ref = \
+                f'A1:{get_column_letter(column_count)}{row_count}'
 
         # Set sheet view options
         # Example:
