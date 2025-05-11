@@ -235,11 +235,13 @@ By default, headers will use the same 'names' as they are returned by the API. T
 
 Instead of using the field names, the export will use the labels as they are defined inside your Serializer. A serializer field defined as `title = serializers.CharField(label=_("Some title"))` would return `Some title` instead of `title`, also supporting translations. If no label is set, it will fall back to using `title`.
 
-### Ignore fields
+### Specify or ignore fields
 
-By default, all fields are exported, but you might want to exclude some fields from your export. To do so, you can set an array with fields you want to exclude: `xlsx_ignore_headers = [<excluded fields>]`.
+By default, all fields are exported. However, this behavior can be changed.
 
-This also works with nested fields, separated with a dot (i.e. `icon.url`).
+To include only a specified list of fields, provide them with: `xlsx_specify_headers = [<fields to include>]`. Conversely, to exclude certain fields from your export, provide them with: `xlsx_ignore_headers = [<excluded fields>]`.
+
+These both work with nested fields, separated with a dot (i.e. `icon.url`).
 
 ### Date/time and number formatting
 Formatting for cells follows [openpyxl formats](https://openpyxl.readthedocs.io/en/stable/_modules/openpyxl/styles/numbers.html).

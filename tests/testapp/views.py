@@ -51,3 +51,11 @@ class DynamicFieldViewSet(XLSXFileMixin, GenericViewSet):
         )
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
+
+
+class SpecifyHeadersViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = AllFieldsModel.objects.all()
+    serializer_class = AllFieldsSerializer
+    renderer_classes = (XLSXRenderer,)
+
+    xlsx_specify_headers = ['title']

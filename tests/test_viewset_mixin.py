@@ -126,3 +126,19 @@ def test_dynamic_field_viewset(api_client, workbook_reader):
 
     row_1_values = [cell.value for cell in data]
     assert row_1_values == ["YUL", "CDG", "YYZ", "MAR"]
+
+
+def test_specify_headers(api_client, workbook_reader):
+    AllFieldsModel.objects.create(title="Hello", age=36)
+
+    response = api_client.get("/specify-headers/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+
+    header, data = list(sheet.rows)
+
+    assert len(header) == 1
+    assert len(data) == 1
+    assert header[0].value == "title"
