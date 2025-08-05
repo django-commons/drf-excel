@@ -95,7 +95,7 @@ class XLSXRenderer(BaseRenderer):
         column_titles = column_header.get("titles", [])
 
         # Check for auto_filter
-        auto_filter = get_attribute(drf_view, 'xlsx_auto_filter', False)
+        auto_filter = get_attribute(drf_view, "xlsx_auto_filter", False)
 
         # If we have results, then flatten field names
         if len(results):
@@ -221,8 +221,7 @@ class XLSXRenderer(BaseRenderer):
 
         # Enable auto filters if requested
         if auto_filter and column_count:
-            self.ws.auto_filter.ref = \
-                f'A1:{get_column_letter(column_count)}{row_count}'
+            self.ws.auto_filter.ref = f"A1:{get_column_letter(column_count)}{row_count}"
 
         # Set sheet view options
         # Example:

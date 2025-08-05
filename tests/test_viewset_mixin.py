@@ -138,4 +138,4 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     wb = workbook_reader(response.content, False)
     sheet = wb.worksheets[0]
 
-    assert sheet.auto_filter.ref == 'A1:B2'
+    assert sheet.auto_filter.ref == "A1:B2"
