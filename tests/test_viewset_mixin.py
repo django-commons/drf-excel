@@ -134,8 +134,8 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     response = api_client.get("/auto-filter/")
     assert response.status_code == 200
 
-    # Note: auto_filter.ref is not available when read_only=True
-    wb = workbook_reader(response.content, False)
+    # Note: auto_filter.ref is not available for read-only workbooks
+    wb = workbook_reader(response.content, read_only=False)
     sheet = wb.worksheets[0]
 
     assert sheet.auto_filter.ref == "A1:B2"
