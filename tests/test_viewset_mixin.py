@@ -126,3 +126,16 @@ def test_dynamic_field_viewset(api_client, workbook_reader):
 
     row_1_values = [cell.value for cell in data]
     assert row_1_values == ["YUL", "CDG", "YYZ", "MAR"]
+
+
+def test_auto_filter_viewset(api_client, workbook_reader):
+    ExampleModel.objects.create(title="test 1", description="This is a test")
+
+    response = api_client.get("/auto-filter/")
+    assert response.status_code == 200
+
+    # Note: auto_filter.ref is not available for read-only workbooks
+    wb = workbook_reader(response.content, read_only=False)
+    sheet = wb.worksheets[0]
+
+    assert sheet.auto_filter.ref == "A1:B2"
