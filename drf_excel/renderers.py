@@ -95,6 +95,9 @@ class XLSXRenderer(BaseRenderer):
         # Make column headers
         column_titles = column_header.get("titles", [])
 
+        # Check for auto_filter
+        auto_filter = get_attribute(drf_view, "xlsx_auto_filter", False)
+
         # If we have results, then flatten field names
         if len(results):
             # Set `xlsx_use_labels = True` inside the API View to enable labels.
@@ -218,6 +221,10 @@ class XLSXRenderer(BaseRenderer):
                 self._make_body(body, row, row_count)
                 row_count += 1
 
+        # Enable auto filters if requested
+        if auto_filter and column_count:
+            self.ws.auto_filter.ref = f"A1:{get_column_letter(column_count)}{row_count}"
+
         # Set sheet view options
         # Example:
         # sheet_view_options = {
@@ -280,9 +287,12 @@ class XLSXRenderer(BaseRenderer):
         for k, v in _fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             # Skip headers that weren't in the list (if present) or were specifically ignored
-            if self.specify_headers is not None and new_key not in self.specify_headers or \
-                    new_key in self.ignore_headers or \
-                    getattr(v, "write_only", False):
+            if (
+                self.specify_headers is not None
+                and new_key not in self.specify_headers
+                or new_key in self.ignore_headers
+                or getattr(v, "write_only", False)
+            ):
                 continue
             # Iterate through fields if field is a serializer. Check for labels and
             # append if `use_labels` is True. Fallback to using keys.

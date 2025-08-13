@@ -235,6 +235,10 @@ By default, headers will use the same 'names' as they are returned by the API. T
 
 Instead of using the field names, the export will use the labels as they are defined inside your Serializer. A serializer field defined as `title = serializers.CharField(label=_("Some title"))` would return `Some title` instead of `title`, also supporting translations. If no label is set, it will fall back to using `title`.
 
+### Auto filter header fields
+
+Filters can automatically be added to the header row by setting `xlsx_auto_filter = True`. The filter will include all header columns in the worksheet.
+
 ### Specify or ignore fields
 
 By default, all fields are exported. However, this behavior can be changed.
