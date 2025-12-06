@@ -239,11 +239,13 @@ Instead of using the field names, the export will use the labels as they are def
 
 Filters can automatically be added to the header row by setting `xlsx_auto_filter = True`. The filter will include all header columns in the worksheet.
 
-### Ignore fields
+### Specify or ignore fields
 
-By default, all fields are exported, but you might want to exclude some fields from your export. To do so, you can set an array with fields you want to exclude: `xlsx_ignore_headers = [<excluded fields>]`.
+By default, all fields are exported. However, this behavior can be changed.
 
-This also works with nested fields, separated with a dot (i.e. `icon.url`).
+To include only a specified list of fields, provide them with: `xlsx_specify_headers = [<fields to include>]`. Conversely, to exclude certain fields from your export, provide them with: `xlsx_ignore_headers = [<excluded fields>]`.
+
+These both work with nested fields, separated with a dot (i.e. `icon.url`).
 
 ### Date/time and number formatting
 Formatting for cells follows [openpyxl formats](https://openpyxl.readthedocs.io/en/stable/_modules/openpyxl/styles/numbers.html).
