@@ -6,6 +6,7 @@ from .testapp.views import (
     DynamicFieldViewSet,
     ExampleViewSet,
     SecretFieldViewSet,
+    SpecifyHeadersViewSet,
 )
 
 router = routers.SimpleRouter()
@@ -14,5 +15,6 @@ router.register(r"all-fields", AllFieldsViewSet)
 router.register(r"secret-field", SecretFieldViewSet)
 router.register(r"dynamic-field", DynamicFieldViewSet, basename="dynamic-field")
 router.register(r"auto-filter", AutoFilterViewSet, basename="auto-filter")
+router.register(r"specify-headers", SpecifyHeadersViewSet, basename="specify-headers")
 
 urlpatterns = router.urls

@@ -139,3 +139,19 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     sheet = wb.worksheets[0]
 
     assert sheet.auto_filter.ref == "A1:B2"
+
+
+def test_specify_headers(api_client, workbook_reader):
+    AllFieldsModel.objects.create(title="Hello", age=36)
+
+    response = api_client.get("/specify-headers/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+
+    header, data = list(sheet.rows)
+
+    assert len(header) == 1
+    assert len(data) == 1
+    assert header[0].value == "title"
