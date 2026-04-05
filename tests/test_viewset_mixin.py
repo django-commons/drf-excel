@@ -112,8 +112,24 @@ def test_secret_field_viewset(api_client, workbook_reader):
     assert [col.value for col in data] == ["foo"]
 
 
-def test_dynamic_field_viewset(api_client, workbook_reader):
+def test_list_dynamic_field_viewset(api_client, workbook_reader):
     response = api_client.get("/dynamic-field/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+
+    header, data = list(sheet.rows)
+
+    header_values = [cell.value for cell in header]
+    assert header_values == ["field_1", "field_98"]
+
+    row_1_values = [cell.value for cell in data]
+    assert row_1_values == ["YUL", "MAR"]
+
+
+def test_detail_dynamic_field_viewset(api_client, workbook_reader):
+    response = api_client.get("/dynamic-field/0/")
     assert response.status_code == 200
 
     wb = workbook_reader(response.content)
@@ -139,3 +155,19 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     sheet = wb.worksheets[0]
 
     assert sheet.auto_filter.ref == "A1:B2"
+
+
+def test_plain_response_view(api_client, workbook_reader):
+    response = api_client.get("/plain/", {"format": "xlsx"})
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+
+    header, data = sheet.rows
+
+    header_values = [cell.value for cell in header]
+    assert header_values == ["title", "description"]
+
+    row_1_values = [cell.value for cell in data]
+    assert row_1_values == ["Test Title", "Test Description"]
