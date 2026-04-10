@@ -35,6 +35,16 @@ class SecretFieldSerializer(serializers.ModelSerializer):
         extra_kwargs = {"secret": {"write_only": True}}
 
 
+class AuthorSerializer(serializers.Serializer):
+    name = serializers.CharField(label="Author Name")
+    email = serializers.CharField(label="Email Address")
+
+
+class NestedSerializer(serializers.Serializer):
+    title = serializers.CharField(label="Title")
+    author = AuthorSerializer(label="Author")
+
+
 class DynamicFieldSerializer(serializers.Serializer):
     field_1 = serializers.CharField()
     field_2 = serializers.CharField()

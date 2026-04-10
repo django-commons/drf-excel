@@ -9,6 +9,7 @@ from .serializers import (
     AllFieldsSerializer,
     DynamicFieldSerializer,
     ExampleSerializer,
+    NestedSerializer,
     SecretFieldSerializer,
 )
 
@@ -51,6 +52,86 @@ class DynamicFieldViewSet(XLSXFileMixin, GenericViewSet):
         )
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
+
+
+class NestedViewSet(XLSXFileMixin, GenericViewSet):
+    serializer_class = NestedSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "nested.xlsx"
+
+    def list(self, request, *args, **kwargs):
+        return Response(
+            [
+                {
+                    "title": "Post 1",
+                    "author": {"name": "Alice", "email": "alice@example.com"},
+                },
+                {
+                    "title": "Post 2",
+                    "author": {"name": "Bob", "email": "bob@example.com"},
+                },
+            ]
+        )
+
+
+class NestedLabelsViewSet(NestedViewSet):
+    xlsx_use_labels = True
+
+
+class CustomColsViewSet(XLSXFileMixin, GenericViewSet):
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "custom_cols.xlsx"
+    xlsx_custom_cols = {
+        "extra": {"label": "Extra Column", "formatter": lambda row: "computed"},
+    }
+
+    def list(self, request, *args, **kwargs):
+        return Response([{"title": "test", "description": "desc"}])
+
+    def get_serializer(self, *args, **kwargs):
+        return ExampleSerializer()
+
+
+class ColumnTitlesViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    column_header = {
+        "titles": ["Title Override", "Description Override"],
+    }
+
+
+class ColumnWidthListViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    column_header = {
+        "column_width": [10, 30],
+    }
+
+
+class RowColorViewSet(XLSXFileMixin, GenericViewSet):
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "row_color.xlsx"
+
+    def list(self, request, *args, **kwargs):
+        return Response(
+            [
+                {"title": "colored", "description": "row", "row_color": "FF0000"},
+            ]
+        )
+
+    def get_serializer(self, *args, **kwargs):
+        return ExampleSerializer()
+
+
+class UseLabelsViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    xlsx_use_labels = True
 
 
 class AutoFilterViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
