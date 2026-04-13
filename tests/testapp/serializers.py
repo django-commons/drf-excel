@@ -45,3 +45,12 @@ class DynamicFieldSerializer(serializers.Serializer):
         # Fields can be added dynamically
         self.fields["field_99"] = serializers.CharField()
         self.fields["field_98"] = serializers.CharField()
+
+    @classmethod
+    def many_init(cls, *args, **kwargs):
+        list_serializer = super().many_init(*args, **kwargs)
+
+        # Some fields may be deleted from the list serializer.
+        del list_serializer.child.fields["field_2"]
+        del list_serializer.child.fields["field_99"]
+        return list_serializer

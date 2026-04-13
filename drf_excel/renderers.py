@@ -156,10 +156,16 @@ class XLSXRenderer(BaseRenderer):
             # 'custom_func', allowing for formatting logic
             self.custom_mappings = getattr(drf_view, "xlsx_custom_mappings", dict())
 
-            self.fields_dict = self._serializer_fields(drf_view.get_serializer())
+            try:
+                serializer = data.serializer
+            except AttributeError:
+                serializer = drf_view.get_serializer()
+            serializer = getattr(serializer, "child", serializer)
+
+            self.fields_dict = self._serializer_fields(serializer)
 
             xlsx_header_dict = self._flatten_serializer_keys(
-                drf_view.get_serializer(), use_labels=use_labels
+                serializer, use_labels=use_labels
             )
             if self.custom_cols:
                 custom_header_dict = {
