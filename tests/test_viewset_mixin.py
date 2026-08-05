@@ -249,3 +249,58 @@ def test_use_labels_viewset(api_client, workbook_reader):
 
     header = [col.value for col in rows[0]]
     assert header == ["Title", "Description"]
+
+
+class TestSpecifyHeaders:
+    @pytest.fixture
+    def rows_at(self, api_client, workbook_reader):
+        """Return the header and first data row values of the export at ``url``."""
+
+        def _rows_at(url):
+            response = api_client.get(url)
+            assert response.status_code == 200
+
+            wb = workbook_reader(response.content)
+            rows = list(wb.worksheets[0].rows)
+            return (
+                [cell.value for cell in rows[0]],
+                [cell.value for cell in rows[1]] if len(rows) > 1 else [],
+            )
+
+        return _rows_at
+
+    def test_specified_fields_only(self, rows_at):
+        """Only the specified fields are exported, with their values."""
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-headers/") == (["title"], ["Hello"])
+
+    def test_unknown_field_is_ignored(self, rows_at):
+        """Names that don't match a serializer field are silently dropped.
+
+        Columns keep the serializer's declaration order, not the order given in
+        ``xlsx_specify_headers``.
+        """
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-headers-order/") == (["title", "age"], ["Hello", 36])
+
+    def test_with_ignore_headers(self, rows_at):
+        """``xlsx_ignore_headers`` wins over ``xlsx_specify_headers``."""
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-and-ignore-headers/") == (["title"], ["Hello"])
+
+    def test_nested_field(self, rows_at):
+        """A nested field can be specified with a dotted path."""
+        assert rows_at("/specify-nested-headers/") == (
+            ["title", "author.name"],
+            ["Post 1", "Alice"],
+        )
+
+    def test_nested_serializer(self, rows_at):
+        """Specifying a nested serializer includes all of its fields."""
+        assert rows_at("/specify-nested-parent-header/") == (
+            ["author.name", "author.email"],
+            ["Alice", "alice@example.com"],
+        )

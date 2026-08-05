@@ -12,6 +12,11 @@ from .testapp.views import (
     NestedViewSet,
     RowColorViewSet,
     SecretFieldViewSet,
+    SpecifyAndIgnoreHeadersViewSet,
+    SpecifyHeadersOrderViewSet,
+    SpecifyHeadersViewSet,
+    SpecifyNestedHeadersViewSet,
+    SpecifyNestedParentHeaderViewSet,
     UseLabelsViewSet,
 )
 
@@ -30,5 +35,26 @@ router.register(
 )
 router.register(r"row-color", RowColorViewSet, basename="row-color")
 router.register(r"use-labels", UseLabelsViewSet, basename="use-labels")
+router.register(r"specify-headers", SpecifyHeadersViewSet, basename="specify-headers")
+router.register(
+    r"specify-headers-order",
+    SpecifyHeadersOrderViewSet,
+    basename="specify-headers-order",
+)
+router.register(
+    r"specify-and-ignore-headers",
+    SpecifyAndIgnoreHeadersViewSet,
+    basename="specify-and-ignore-headers",
+)
+router.register(
+    r"specify-nested-headers",
+    SpecifyNestedHeadersViewSet,
+    basename="specify-nested-headers",
+)
+router.register(
+    r"specify-nested-parent-header",
+    SpecifyNestedParentHeaderViewSet,
+    basename="specify-nested-parent-header",
+)
 
 urlpatterns = router.urls

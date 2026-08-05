@@ -42,6 +42,7 @@ class XLSXRenderer(BaseRenderer):
     format = "xlsx"  # Reserved word, but required by BaseRenderer
     combined_header_dict = {}
     fields_dict = {}
+    specify_headers = None
     ignore_headers = []
     boolean_display = None
     column_data_styles = None
@@ -102,7 +103,8 @@ class XLSXRenderer(BaseRenderer):
             # Set `xlsx_use_labels = True` inside the API View to enable labels.
             use_labels = getattr(drf_view, "xlsx_use_labels", False)
 
-            # A list of header keys to ignore in our export
+            # A list of header keys to use or ignore in our export
+            self.specify_headers = getattr(drf_view, "xlsx_specify_headers", None)
             self.ignore_headers = getattr(drf_view, "xlsx_ignore_headers", [])
 
             # Create a mapping dict named `xlsx_boolean_labels` inside the API View.
@@ -256,6 +258,21 @@ class XLSXRenderer(BaseRenderer):
                 _fields_dict[new_key] = v
         return _fields_dict
 
+    def _is_specified(self, key, key_sep):
+        """
+        Whether `key` is selected by `xlsx_specify_headers`. A key is selected when it
+        is listed itself, when an ancestor is listed (include everything below it) or
+        when a descendant is listed (so nested serializers are traversed).
+        """
+        if self.specify_headers is None:
+            return True
+        return any(
+            key == header
+            or key.startswith(f"{header}{key_sep}")
+            or header.startswith(f"{key}{key_sep}")
+            for header in self.specify_headers
+        )
+
     def _flatten_serializer_keys(
         self,
         serializer,
@@ -279,8 +296,12 @@ class XLSXRenderer(BaseRenderer):
         _fields = serializer.fields
         for k, v in _fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
-            # Skip headers we want to ignore
-            if new_key in self.ignore_headers or getattr(v, "write_only", False):
+            # Skip headers that weren't in the list (if present) or were specifically ignored
+            if (
+                not self._is_specified(new_key, key_sep)
+                or new_key in self.ignore_headers
+                or getattr(v, "write_only", False)
+            ):
                 continue
             # Iterate through fields if field is a serializer. Check for labels and
             # append if `use_labels` is True. Fallback to using keys.
