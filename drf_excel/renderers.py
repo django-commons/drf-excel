@@ -272,15 +272,10 @@ class XLSXRenderer(BaseRenderer):
         Iterate through serializer fields recursively when field is a nested serializer. Skip write_only fields.
         """
 
-        def _get_label(parent_label, label_sep, obj):
-            if getattr(v, "label", None):
-                return (
-                    f"{parent_label}{label_sep}{v.label}"
-                    if parent_label
-                    else str(v.label)
-                )
-            else:
-                return False
+        def _get_label(parent_label, label_sep):
+            return (
+                f"{parent_label}{label_sep}{v.label}" if parent_label else str(v.label)
+            )
 
         _header_dict = {}
         _fields = serializer.fields
@@ -302,7 +297,7 @@ class XLSXRenderer(BaseRenderer):
                         self._flatten_serializer_keys(
                             v,
                             new_key,
-                            _get_label(parent_label, label_sep, v),
+                            _get_label(parent_label, label_sep),
                             key_sep,
                             list_sep,
                             label_sep,
@@ -322,7 +317,7 @@ class XLSXRenderer(BaseRenderer):
                     )
             elif isinstance(v, Field):
                 if use_labels and getattr(v, "label", None):
-                    _header_dict[new_key] = _get_label(parent_label, label_sep, v)
+                    _header_dict[new_key] = _get_label(parent_label, label_sep)
                 else:
                     _header_dict[new_key] = new_key
 

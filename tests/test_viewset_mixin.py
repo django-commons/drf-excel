@@ -141,6 +141,116 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     assert sheet.auto_filter.ref == "A1:B2"
 
 
+def test_nested_serializer_viewset(api_client, workbook_reader):
+    """Covers nested serializer flattening."""
+    response = api_client.get("/nested/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+    assert len(rows) == 3
+
+    header = [col.value for col in rows[0]]
+    assert header == ["title", "author.name", "author.email"]
+
+    row1 = [col.value for col in rows[1]]
+    assert row1 == ["Post 1", "Alice", "alice@example.com"]
+
+    row2 = [col.value for col in rows[2]]
+    assert row2 == ["Post 2", "Bob", "bob@example.com"]
+
+
+def test_nested_serializer_with_labels(api_client, workbook_reader):
+    """Covers nested serializer with use_labels."""
+    response = api_client.get("/nested-labels/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+
+    header = [col.value for col in rows[0]]
+    assert header == ["Title", "Author > Author Name", "Author > Email Address"]
+
+
+def test_custom_cols_viewset(api_client, workbook_reader):
+    """Covers custom_cols header creation."""
+    response = api_client.get("/custom-cols/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+
+    header = [col.value for col in rows[0]]
+    assert "Extra Column" in header
+    assert "title" in header
+    assert "description" in header
+
+
+def test_column_titles_override(api_client, workbook_reader):
+    """Covers column_titles override."""
+    ExampleModel.objects.create(title="test", description="desc")
+
+    response = api_client.get("/column-titles/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+
+    header = [col.value for col in rows[0]]
+    assert header == ["Title Override", "Description Override"]
+
+
+def test_column_width_as_list(api_client, workbook_reader):
+    """Covers column_width as a list."""
+    ExampleModel.objects.create(title="test", description="desc")
+
+    response = api_client.get("/column-width-list/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content, read_only=False)
+    sheet = wb.worksheets[0]
+
+    assert sheet.column_dimensions["A"].width == 10
+    assert sheet.column_dimensions["B"].width == 30
+
+
+def test_row_color(api_client, workbook_reader):
+    """Covers row_color handling."""
+    response = api_client.get("/row-color/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content, read_only=False)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+
+    # row_color should not appear as a column header
+    header = [col.value for col in rows[0]]
+    assert "row_color" not in header
+
+    # The data row should have the fill color applied
+    data_row = rows[1]
+    assert data_row[0].fill.start_color.rgb == "00FF0000"
+
+
+def test_use_labels_viewset(api_client, workbook_reader):
+    """Covers use_labels on simple fields."""
+    ExampleModel.objects.create(title="test", description="desc")
+
+    response = api_client.get("/use-labels/")
+    assert response.status_code == 200
+
+    wb = workbook_reader(response.content)
+    sheet = wb.worksheets[0]
+    rows = list(sheet.rows)
+
+    header = [col.value for col in rows[0]]
+    assert header == ["Title", "Description"]
+
+
 def test_specify_headers(api_client, workbook_reader):
     AllFieldsModel.objects.create(title="Hello", age=36)
 
