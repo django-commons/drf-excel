@@ -251,17 +251,56 @@ def test_use_labels_viewset(api_client, workbook_reader):
     assert header == ["Title", "Description"]
 
 
-def test_specify_headers(api_client, workbook_reader):
-    AllFieldsModel.objects.create(title="Hello", age=36)
+class TestSpecifyHeaders:
+    @pytest.fixture
+    def rows_at(self, api_client, workbook_reader):
+        """Return the header and first data row values of the export at ``url``."""
 
-    response = api_client.get("/specify-headers/")
-    assert response.status_code == 200
+        def _rows_at(url):
+            response = api_client.get(url)
+            assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
-    sheet = wb.worksheets[0]
+            wb = workbook_reader(response.content)
+            rows = list(wb.worksheets[0].rows)
+            return (
+                [cell.value for cell in rows[0]],
+                [cell.value for cell in rows[1]] if len(rows) > 1 else [],
+            )
 
-    header, data = list(sheet.rows)
+        return _rows_at
 
-    assert len(header) == 1
-    assert len(data) == 1
-    assert header[0].value == "title"
+    def test_specified_fields_only(self, rows_at):
+        """Only the specified fields are exported, with their values."""
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-headers/") == (["title"], ["Hello"])
+
+    def test_unknown_field_is_ignored(self, rows_at):
+        """Names that don't match a serializer field are silently dropped.
+
+        Columns keep the serializer's declaration order, not the order given in
+        ``xlsx_specify_headers``.
+        """
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-headers-order/") == (["title", "age"], ["Hello", 36])
+
+    def test_with_ignore_headers(self, rows_at):
+        """``xlsx_ignore_headers`` wins over ``xlsx_specify_headers``."""
+        AllFieldsModel.objects.create(title="Hello", age=36)
+
+        assert rows_at("/specify-and-ignore-headers/") == (["title"], ["Hello"])
+
+    def test_nested_field(self, rows_at):
+        """A nested field can be specified with a dotted path."""
+        assert rows_at("/specify-nested-headers/") == (
+            ["title", "author.name"],
+            ["Post 1", "Alice"],
+        )
+
+    def test_nested_serializer(self, rows_at):
+        """Specifying a nested serializer includes all of its fields."""
+        assert rows_at("/specify-nested-parent-header/") == (
+            ["author.name", "author.email"],
+            ["Alice", "alice@example.com"],
+        )

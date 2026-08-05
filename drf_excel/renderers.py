@@ -258,6 +258,21 @@ class XLSXRenderer(BaseRenderer):
                 _fields_dict[new_key] = v
         return _fields_dict
 
+    def _is_specified(self, key, key_sep):
+        """
+        Whether `key` is selected by `xlsx_specify_headers`. A key is selected when it
+        is listed itself, when an ancestor is listed (include everything below it) or
+        when a descendant is listed (so nested serializers are traversed).
+        """
+        if self.specify_headers is None:
+            return True
+        return any(
+            key == header
+            or key.startswith(f"{header}{key_sep}")
+            or header.startswith(f"{key}{key_sep}")
+            for header in self.specify_headers
+        )
+
     def _flatten_serializer_keys(
         self,
         serializer,
@@ -283,8 +298,7 @@ class XLSXRenderer(BaseRenderer):
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
             # Skip headers that weren't in the list (if present) or were specifically ignored
             if (
-                self.specify_headers is not None
-                and new_key not in self.specify_headers
+                not self._is_specified(new_key, key_sep)
                 or new_key in self.ignore_headers
                 or getattr(v, "write_only", False)
             ):

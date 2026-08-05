@@ -245,7 +245,13 @@ By default, all fields are exported. However, this behavior can be changed.
 
 To include only a specified list of fields, provide them with: `xlsx_specify_headers = [<fields to include>]`. Conversely, to exclude certain fields from your export, provide them with: `xlsx_ignore_headers = [<excluded fields>]`.
 
-These both work with nested fields, separated with a dot (i.e. `icon.url`).
+These both work with nested fields, separated with a dot (i.e. `icon.url`). Naming a nested serializer itself (i.e. `icon`) includes all of the fields below it.
+
+A few things worth knowing:
+
+* When both options are set, `xlsx_ignore_headers` wins: a field named in both is excluded.
+* Columns follow the order in which the fields are declared on the serializer, not the order of `xlsx_specify_headers`. Keep this in mind when combining it with the `titles` of `column_header`, which are applied positionally.
+* Names that match no serializer field are ignored silently, so a typo results in a missing column rather than an error.
 
 ### Date/time and number formatting
 Formatting for cells follows [openpyxl formats](https://openpyxl.readthedocs.io/en/stable/_modules/openpyxl/styles/numbers.html).

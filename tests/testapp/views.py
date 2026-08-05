@@ -148,3 +148,24 @@ class SpecifyHeadersViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     renderer_classes = (XLSXRenderer,)
 
     xlsx_specify_headers = ["title"]
+
+
+class SpecifyHeadersOrderViewSet(SpecifyHeadersViewSet):
+    # Declared in a different order than the serializer, and with a field that
+    # doesn't exist on the serializer
+    xlsx_specify_headers = ["age", "title", "does_not_exist"]
+
+
+class SpecifyAndIgnoreHeadersViewSet(SpecifyHeadersViewSet):
+    xlsx_specify_headers = ["title", "age"]
+    xlsx_ignore_headers = ["age"]
+
+
+class SpecifyNestedHeadersViewSet(NestedViewSet):
+    # Nested field addressed with a dotted path
+    xlsx_specify_headers = ["title", "author.name"]
+
+
+class SpecifyNestedParentHeaderViewSet(NestedViewSet):
+    # Nested serializer addressed by its own key
+    xlsx_specify_headers = ["author"]
