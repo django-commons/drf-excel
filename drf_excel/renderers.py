@@ -401,9 +401,9 @@ class XLSXRenderer(BaseRenderer):
 
         if isinstance(field, BooleanField):
             return XLSXBooleanField(boolean_display=self.boolean_display, **kwargs)
-        elif isinstance(field, (IntegerField, FloatField, DecimalField)):
+        elif isinstance(field, IntegerField | FloatField | DecimalField):
             return XLSXNumberField(**kwargs)
-        elif isinstance(field, (DateTimeField, DateField, TimeField)):
+        elif isinstance(field, DateTimeField | DateField | TimeField):
             return XLSXDateField(**kwargs)
         elif (
             isinstance(field, ListField)
