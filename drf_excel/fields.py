@@ -1,9 +1,9 @@
 import contextlib
 import datetime
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from decimal import Decimal
-from typing import Any, Callable, Union
+from typing import Any
 
 from django.utils.dateparse import parse_date, parse_datetime, parse_time
 from openpyxl.cell import Cell
@@ -39,7 +39,7 @@ class XLSXField:
         value: Any,
         field: Field,
         style: XLSXStyle,
-        mapping: Union[str, Callable],
+        mapping: str | Callable,
         cell_style: XLSXStyle,
     ):
         self.key = key
