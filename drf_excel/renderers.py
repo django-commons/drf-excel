@@ -59,7 +59,7 @@ class XLSXRenderer(BaseRenderer):
         if data is None:
             return b""
 
-        if not self._check_validation_data(data):
+        if not self._check_validation_data(data, renderer_context):
             return json.dumps(data)
 
         wb = Workbook()
@@ -244,7 +244,12 @@ class XLSXRenderer(BaseRenderer):
 
         return virtual_workbook
 
-    def _check_validation_data(self, data):
+    def _check_validation_data(self, data, renderer_context=None):
+        response = (renderer_context or {}).get("response")
+        if response is not None:
+            return 200 <= response.status_code < 300
+        # No response available (e.g. calling the renderer directly) -
+        # fall back to the old heuristic.
         detail_key = "detail"
         return detail_key not in data
 
