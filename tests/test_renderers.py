@@ -24,6 +24,31 @@ class TestXLSXRenderer:
     def test_validation_error(self):
         assert self.renderer.render({"detail": "invalid"}) == '{"detail": "invalid"}'
 
+    def test_validation_with_successful_response(self):
+        """
+        A successful (200) response whose payload happens to contain a
+        "detail" key - a perfectly ordinary field name for real data -
+        should still be treated as valid data, not short-circuited to raw
+        JSON.
+
+        https://github.com/django-commons/drf-excel/issues/26
+        """
+        data = {"detail": "Successfully processed 3 records", "count": 3}
+        response = Response(data, status=200)
+        response.renderer_context = {"response": response}
+        assert self.renderer._check_validation_data(data, response.renderer_context)
+
+    def test_validation_with_custom_error_response(self):
+        """
+        A real error response from a custom exception handler that
+        doesn't use Django REST Framework's "detail" convention should
+        still be treated as an error, based on the response status code.
+        """
+        data = {"error_code": "RATE_LIMITED", "message": "Too many requests"}
+        response = Response(data, status=429)
+        response.renderer_context = {"response": response}
+        assert not self.renderer._check_validation_data(data, response.renderer_context)
+
     def test_none(self):
         assert self.renderer.render(None) == b""
 
