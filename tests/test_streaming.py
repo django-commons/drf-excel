@@ -333,7 +333,9 @@ def test_streaming_export_rejects_invalid_chunk_size(
     chunk_size,
     error,
 ):
-    monkeypatch.setattr(ExampleViewSet, "xlsx_iterator_chunk_size", chunk_size, raising=False)
+    monkeypatch.setattr(
+        ExampleViewSet, "xlsx_iterator_chunk_size", chunk_size, raising=False
+    )
 
     with pytest.raises(error, match="xlsx_iterator_chunk_size"):
         api_client.get("/examples/export-xlsx/")
@@ -497,7 +499,9 @@ def test_streaming_export_applies_row_color(api_client, workbook_reader, monkeyp
             fields = ("title", "description", "row_color")
 
     ExampleModel.objects.create(title="Colored", description="row")
-    monkeypatch.setattr(ExampleViewSet, "serializer_class", ColoredSerializer, raising=False)
+    monkeypatch.setattr(
+        ExampleViewSet, "serializer_class", ColoredSerializer, raising=False
+    )
 
     response = api_client.get("/examples/export-xlsx/")
     workbook = workbook_reader(read_streaming_response(response), read_only=False)
@@ -538,7 +542,9 @@ def test_streaming_export_closes_temporary_file_when_save_fails(
         raise OSError("disk write failed")
 
     monkeypatch.setattr(
-        streaming_module, "TemporaryFile", lambda **kwargs: temporary_file,
+        streaming_module,
+        "TemporaryFile",
+        lambda **kwargs: temporary_file,
         raising=False,
     )
     monkeypatch.setattr(Workbook, "save", fail_save, raising=False)
