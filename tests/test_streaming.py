@@ -140,6 +140,7 @@ def test_streaming_export_uses_queryset_iterator(
         QuerySet,
         "iterator",
         tracked_iterator,
+        raising=False,
     )
 
     ExampleModel.objects.create(
@@ -332,21 +333,21 @@ def test_streaming_export_rejects_invalid_chunk_size(
     chunk_size,
     error,
 ):
-    monkeypatch.setattr(ExampleViewSet, "xlsx_iterator_chunk_size", chunk_size)
+    monkeypatch.setattr(ExampleViewSet, "xlsx_iterator_chunk_size", chunk_size, raising=False)
 
     with pytest.raises(error, match="xlsx_iterator_chunk_size"):
         api_client.get("/examples/export-xlsx/")
 
 
 def test_streaming_export_requires_queryset_iterator(api_client, monkeypatch):
-    monkeypatch.setattr(ExampleViewSet, "get_queryset", lambda self: [])
+    monkeypatch.setattr(ExampleViewSet, "get_queryset", lambda self: [], raising=False)
 
     with pytest.raises(TypeError, match="supports iterator"):
         api_client.get("/examples/export-xlsx/")
 
 
 def test_streaming_export_rejects_header_images(api_client, monkeypatch):
-    monkeypatch.setattr(ExampleViewSet, "header", {"img": "unused.png"})
+    monkeypatch.setattr(ExampleViewSet, "header", {"img": "unused.png"}, raising=False)
 
     with pytest.raises(NotImplementedError, match="Images in the XLSX header"):
         api_client.get("/examples/export-xlsx/")
@@ -367,6 +368,7 @@ def test_streaming_export_applies_workbook_options(
             "height": 30,
             "style": {"font": {"bold": True}},
         },
+        raising=False,
     )
     monkeypatch.setattr(
         ExampleViewSet,
@@ -377,17 +379,20 @@ def test_streaming_export_applies_workbook_options(
             "column_width": [12],
             "style": {"font": {"italic": True}},
         },
+        raising=False,
     )
     monkeypatch.setattr(
         ExampleViewSet,
         "body",
         {"height": 18, "style": {"font": {"bold": True}}},
+        raising=False,
     )
-    monkeypatch.setattr(ExampleViewSet, "xlsx_auto_filter", True)
+    monkeypatch.setattr(ExampleViewSet, "xlsx_auto_filter", True, raising=False)
     monkeypatch.setattr(
         ExampleViewSet,
         "sheet_view_options",
         {"showGridLines": False},
+        raising=False,
     )
 
     response = api_client.get("/examples/export-xlsx/")
@@ -421,11 +426,13 @@ def test_streaming_export_can_omit_report_title(
         ExampleViewSet,
         "header",
         {"use_header": False, "tab_title": "No title"},
+        raising=False,
     )
     monkeypatch.setattr(
         ExampleViewSet,
         "column_header",
         {"column_width": 24},
+        raising=False,
     )
 
     response = api_client.get("/examples/export-xlsx/")
@@ -447,14 +454,16 @@ def test_streaming_export_handles_custom_columns_and_mappings(
         ExampleViewSet,
         "xlsx_custom_cols",
         {"extra": {"label": "Extra column"}},
+        raising=False,
     )
     monkeypatch.setattr(
         ExampleViewSet,
         "xlsx_custom_mappings",
         {"title": lambda value: value.upper()},
+        raising=False,
     )
-    monkeypatch.setattr(ExampleViewSet, "xlsx_specify_headers", ["title", "extra"])
-    monkeypatch.setattr(ExampleViewSet, "xlsx_ignore_headers", [])
+    monkeypatch.setattr(ExampleViewSet, "xlsx_specify_headers", ["title", "extra"], raising=False)
+    monkeypatch.setattr(ExampleViewSet, "xlsx_ignore_headers", [], raising=False)
 
     response = api_client.get("/examples/export-xlsx/")
     workbook = workbook_reader(read_streaming_response(response))
@@ -478,7 +487,7 @@ def test_streaming_export_applies_row_color(api_client, workbook_reader, monkeyp
             fields = ("title", "description", "row_color")
 
     ExampleModel.objects.create(title="Colored", description="row")
-    monkeypatch.setattr(ExampleViewSet, "serializer_class", ColoredSerializer)
+    monkeypatch.setattr(ExampleViewSet, "serializer_class", ColoredSerializer, raising=False)
 
     response = api_client.get("/examples/export-xlsx/")
     workbook = workbook_reader(read_streaming_response(response), read_only=False)
@@ -494,8 +503,8 @@ def test_streaming_export_uses_filename_fallback(
     api_client,
     monkeypatch,
 ):
-    monkeypatch.setattr(ExampleViewSet, "get_filename", None)
-    monkeypatch.setattr(ExampleViewSet, "filename", "fallback.xlsx")
+    monkeypatch.setattr(ExampleViewSet, "get_filename", None, raising=False)
+    monkeypatch.setattr(ExampleViewSet, "filename", "fallback.xlsx", raising=False)
 
     response = api_client.get("/examples/export-xlsx/")
 
@@ -520,8 +529,9 @@ def test_streaming_export_closes_temporary_file_when_save_fails(
 
     monkeypatch.setattr(
         streaming_module, "TemporaryFile", lambda **kwargs: temporary_file
+        raising=False,
     )
-    monkeypatch.setattr(Workbook, "save", fail_save)
+    monkeypatch.setattr(Workbook, "save", fail_save, raising=False)
 
     with pytest.raises(OSError, match="disk write failed"):
         api_client.get("/examples/export-xlsx/")
@@ -567,7 +577,7 @@ def test_write_only_number_cell_preserves_number_format():
 
     cell = field.write_only_cell(worksheet)
 
-    assert isinstance(cell, WriteOnlyCell)
+    assert cell.parent is worksheet
     assert cell.value == 42
     assert cell.number_format == "0"
 
@@ -585,6 +595,6 @@ def test_write_only_date_cell_preserves_number_format():
 
     cell = field.write_only_cell(worksheet)
 
-    assert isinstance(cell, WriteOnlyCell)
+    assert cell.parent is worksheet
     assert cell.value.year == 2025
     assert cell.number_format == "yyyy-mm-dd h:mm:ss"
