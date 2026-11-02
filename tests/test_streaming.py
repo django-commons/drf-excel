@@ -543,13 +543,14 @@ def test_write_only_cell_supports_custom_mappings(mapping, value, expected):
         field=CharField(),
         style=XLSXStyle(),
         mapping=mapping,
-        cell_style=None,
+        cell_style=XLSXStyle({"font": {"bold": True}}),
     )
 
     cell = field.write_only_cell(worksheet)
 
     assert isinstance(cell, WriteOnlyCell)
     assert cell.value == expected
+    assert cell.font.bold is True
 
 
 def test_write_only_number_cell_preserves_number_format():
