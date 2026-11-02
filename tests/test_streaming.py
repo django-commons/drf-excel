@@ -4,7 +4,6 @@ import os
 import psutil
 import pytest
 from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
 from rest_framework import serializers
 from rest_framework.fields import CharField, DateTimeField, IntegerField
 from rest_framework.test import APIClient
@@ -550,7 +549,7 @@ def test_write_only_cell_supports_custom_mappings(mapping, value, expected):
 
     cell = field.write_only_cell(worksheet)
 
-    assert isinstance(cell, WriteOnlyCell)
+    assert cell.parent is worksheet
     assert cell.value == expected
     assert cell.font.bold is True
 
