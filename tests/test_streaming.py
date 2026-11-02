@@ -1,4 +1,3 @@
-
 import gc
 import os
 
@@ -39,7 +38,7 @@ def measure_peak_rss(api_client):
     assert response.streaming is True
 
     try:
-        for chunk in response.streaming_content:
+        for _chunk in response.streaming_content:
             current = process.memory_info().rss
             peak = max(peak, current)
     finally:
@@ -52,20 +51,22 @@ def test_streaming_export_returns_all_queryset_records(
     api_client,
     workbook_reader,
 ):
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title="First",
-            description="First description",
-        ),
-        ExampleModel(
-            title="Second",
-            description="Second description",
-        ),
-        ExampleModel(
-            title="Third",
-            description="Third description",
-        ),
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title="First",
+                description="First description",
+            ),
+            ExampleModel(
+                title="Second",
+                description="Second description",
+            ),
+            ExampleModel(
+                title="Third",
+                description="Third description",
+            ),
+        ]
+    )
 
     response = api_client.get("/examples/export-xlsx/")
 
@@ -144,7 +145,7 @@ def test_streaming_export_uses_queryset_iterator(
 
     assert response.status_code == 200
 
-    for chunk in response.streaming_content:
+    for _chunk in response.streaming_content:
         pass
 
     assert iterator_calls == [2000]
@@ -156,13 +157,15 @@ def test_streaming_export_handles_many_records(
 ):
     record_count = 1500
 
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title=f"Record {index}",
-            description=f"Description {index}",
-        )
-        for index in range(record_count)
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title=f"Record {index}",
+                description=f"Description {index}",
+            )
+            for index in range(record_count)
+        ]
+    )
 
     response = api_client.get("/examples/export-xlsx/")
 
@@ -201,7 +204,7 @@ def test_streaming_export_memory_growth(api_client):
             response = api_client.get("/examples/export-xlsx/")
             assert response.status_code == 200
 
-            for chunk in response.streaming_content:
+            for _chunk in response.streaming_content:
                 pass
 
             _, peak = tracemalloc.get_traced_memory()
@@ -220,25 +223,29 @@ def test_streaming_export_memory_growth(api_client):
     ExampleModel.objects.all().delete()
 
     # Small dataset
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title=f"Record {index}",
-            description=f"Description {index}",
-        )
-        for index in range(500)
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title=f"Record {index}",
+                description=f"Description {index}",
+            )
+            for index in range(500)
+        ]
+    )
 
     small_peak = measure_peak_memory()
     ExampleModel.objects.all().delete()
 
     # Large dataset
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title=f"Record {index}",
-            description=f"Description {index}",
-        )
-        for index in range(20000)
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title=f"Record {index}",
+                description=f"Description {index}",
+            )
+            for index in range(20000)
+        ]
+    )
 
     large_peak = measure_peak_memory()
 
@@ -265,26 +272,30 @@ def test_streaming_export_rss_memory_growth(api_client):
     ExampleModel.objects.all().delete()
 
     # Small dataset
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title=f"Record {index}",
-            description=f"Description {index}",
-        )
-        for index in range(500)
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title=f"Record {index}",
+                description=f"Description {index}",
+            )
+            for index in range(500)
+        ]
+    )
 
     small_peak = measure_peak_rss(api_client)
     ExampleModel.objects.all().delete()
     gc.collect()
 
     # Large dataset
-    ExampleModel.objects.bulk_create([
-        ExampleModel(
-            title=f"Record {index}",
-            description=f"Description {index}",
-        )
-        for index in range(20000)
-    ])
+    ExampleModel.objects.bulk_create(
+        [
+            ExampleModel(
+                title=f"Record {index}",
+                description=f"Description {index}",
+            )
+            for index in range(20000)
+        ]
+    )
 
     large_peak = measure_peak_rss(api_client)
 
