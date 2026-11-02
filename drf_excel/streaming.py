@@ -138,11 +138,28 @@ class XLSXStreamingMixin:
                 "by the streaming exporter."
             )
 
+        headers = [key for key in renderer.combined_header_dict if key != "row_color"]
+
         use_header = bool(header) and header.get("use_header", True)
 
         workbook = Workbook(write_only=True)
 
         worksheet = workbook.create_sheet(title=header.get("tab_title", "Report"))
+
+        # Write-only worksheets serialize column dimensions with the first row,
+        # so configure widths before appending any rows.
+        column_width = column_header.get("column_width", 20)
+
+        for index in range(len(headers)):
+            column_letter = get_column_letter(index + 1)
+
+            if isinstance(column_width, list):
+                if index < len(column_width):
+                    worksheet.column_dimensions[column_letter].width = column_width[
+                        index
+                    ]
+            else:
+                worksheet.column_dimensions[column_letter].width = column_width
 
         current_row = 1
 
@@ -164,8 +181,6 @@ class XLSXStreamingMixin:
 
         # Keep the original renderer's column order and omit row_color,
         # which is a row-level formatting field rather than a data column.
-        headers = [key for key in renderer.combined_header_dict if key != "row_color"]
-
         column_titles = column_header.get("titles", [])
 
         column_style = (
@@ -197,20 +212,6 @@ class XLSXStreamingMixin:
 
             worksheet.append(header_cells)
             current_row += 1
-
-        # Configure column widths before worksheet rows are streamed.
-        column_width = column_header.get("column_width", 20)
-
-        for index in range(len(headers)):
-            column_letter = get_column_letter(index + 1)
-
-            if isinstance(column_width, list):
-                if index < len(column_width):
-                    worksheet.column_dimensions[column_letter].width = column_width[
-                        index
-                    ]
-            else:
-                worksheet.column_dimensions[column_letter].width = column_width
 
         auto_filter = get_attribute(self, "xlsx_auto_filter", False)
 
