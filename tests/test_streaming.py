@@ -9,8 +9,8 @@ from rest_framework import serializers
 from rest_framework.fields import CharField, DateTimeField, IntegerField
 from rest_framework.test import APIClient
 
-from drf_excel.fields import XLSXDateField, XLSXField, XLSXNumberField
 from drf_excel import streaming as streaming_module
+from drf_excel.fields import XLSXDateField, XLSXField, XLSXNumberField
 from drf_excel.utilities import XLSXStyle
 from tests.testapp.models import ExampleModel
 from tests.testapp.views import ExampleViewSet
@@ -519,7 +519,9 @@ def test_streaming_export_closes_temporary_file_when_save_fails(
     def fail_save(self, file_object):
         raise OSError("disk write failed")
 
-    monkeypatch.setattr(streaming_module, "TemporaryFile", lambda **kwargs: temporary_file)
+    monkeypatch.setattr(
+        streaming_module, "TemporaryFile", lambda **kwargs: temporary_file
+    )
     monkeypatch.setattr(Workbook, "save", fail_save)
 
     with pytest.raises(OSError, match="disk write failed"):
