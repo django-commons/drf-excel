@@ -1,4 +1,3 @@
-
 from tempfile import TemporaryFile
 
 from django.http import FileResponse
@@ -39,8 +38,7 @@ class XLSXStreamingMixin:
 
         if not callable(getattr(queryset, "iterator", None)):
             raise TypeError(
-                "XLSX streaming export requires a queryset "
-                "that supports iterator()."
+                "XLSX streaming export requires a queryset " "that supports iterator()."
             )
 
         chunk_size = self.xlsx_iterator_chunk_size
@@ -109,11 +107,7 @@ class XLSXStreamingMixin:
 
         body = get_attribute(self, "body", {}) or {}
 
-        renderer.body_style = (
-            XLSXStyle(body["style"])
-            if "style" in body
-            else None
-        )
+        renderer.body_style = XLSXStyle(body["style"]) if "style" in body else None
 
         renderer.sheet_view_options = (
             get_attribute(self, "sheet_view_options", {}) or {}
@@ -148,9 +142,7 @@ class XLSXStreamingMixin:
 
         workbook = Workbook(write_only=True)
 
-        worksheet = workbook.create_sheet(
-            title=header.get("tab_title", "Report")
-        )
+        worksheet = workbook.create_sheet(title=header.get("tab_title", "Report"))
 
         current_row = 1
 
@@ -165,27 +157,19 @@ class XLSXStreamingMixin:
             if "style" in header:
                 set_cell_style(title_cell, XLSXStyle(header["style"]))
 
-            worksheet.row_dimensions[current_row].height = header.get(
-                "height", 45
-            )
+            worksheet.row_dimensions[current_row].height = header.get("height", 45)
 
             worksheet.append([title_cell])
             current_row += 1
 
         # Keep the original renderer's column order and omit row_color,
         # which is a row-level formatting field rather than a data column.
-        headers = [
-            key
-            for key in renderer.combined_header_dict
-            if key != "row_color"
-        ]
+        headers = [key for key in renderer.combined_header_dict if key != "row_color"]
 
         column_titles = column_header.get("titles", [])
 
         column_style = (
-            XLSXStyle(column_header["style"])
-            if "style" in column_header
-            else None
+            XLSXStyle(column_header["style"]) if "style" in column_header else None
         )
 
         header_cells = []
@@ -207,8 +191,8 @@ class XLSXStreamingMixin:
         header_row = current_row
 
         if header_cells:
-            worksheet.row_dimensions[header_row].height = (
-                column_header.get("height", 45)
+            worksheet.row_dimensions[header_row].height = column_header.get(
+                "height", 45
             )
 
             worksheet.append(header_cells)
@@ -222,9 +206,9 @@ class XLSXStreamingMixin:
 
             if isinstance(column_width, list):
                 if index < len(column_width):
-                    worksheet.column_dimensions[column_letter].width = (
-                        column_width[index]
-                    )
+                    worksheet.column_dimensions[column_letter].width = column_width[
+                        index
+                    ]
             else:
                 worksheet.column_dimensions[column_letter].width = column_width
 
@@ -262,9 +246,7 @@ class XLSXStreamingMixin:
                 for cell in cells:
                     cell.fill = fill
 
-            worksheet.row_dimensions[current_row].height = body.get(
-                "height", 40
-            )
+            worksheet.row_dimensions[current_row].height = body.get("height", 40)
 
             worksheet.append(cells)
             current_row += 1
@@ -273,15 +255,11 @@ class XLSXStreamingMixin:
             last_row = max(header_row, current_row - 1)
             last_column = get_column_letter(len(headers))
 
-            worksheet.auto_filter.ref = (
-                f"A{header_row}:{last_column}{last_row}"
-            )
+            worksheet.auto_filter.ref = f"A{header_row}:{last_column}{last_row}"
 
         # Preserve the existing worksheet view configuration.
         if renderer.sheet_view_options:
-            worksheet.views.sheetView[0] = SheetView(
-                **renderer.sheet_view_options
-            )
+            worksheet.views.sheetView[0] = SheetView(**renderer.sheet_view_options)
 
         # Generate the XLSX archive into a temporary disk-backed file.
         temporary_file = TemporaryFile(mode="w+b")
