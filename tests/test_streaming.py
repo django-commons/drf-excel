@@ -483,7 +483,7 @@ def test_streaming_export_handles_custom_columns_and_mappings(
 
     assert rows == [
         ("title", "Extra column"),
-        ("ORIGINAL", None),
+        ("ORIGINAL",),
     ]
 
 
