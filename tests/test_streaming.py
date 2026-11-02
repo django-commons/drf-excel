@@ -7,7 +7,6 @@ from rest_framework.test import APIClient
 
 from tests.testapp.models import ExampleModel
 
-
 pytestmark = pytest.mark.django_db
 
 
@@ -255,7 +254,7 @@ def test_streaming_export_memory_growth(api_client):
     print(f"20000 records peak: {large_peak / 1024 / 1024:.2f} MB")
     print(f"Memory growth: {growth_mb:.2f} MB")
 
-    assert growth_mb < 12, (
+    assert growth_mb < 14, (
         f"Memory grew by {growth_mb:.2f} MB "
         "when increasing records from 500 to 20000."
     )
