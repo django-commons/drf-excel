@@ -146,6 +146,10 @@ class XLSXStreamingMixin:
 
         worksheet = workbook.create_sheet(title=header.get("tab_title", "Report"))
 
+        # Write-only worksheets serialize view settings with the first row.
+        if renderer.sheet_view_options:
+            worksheet.views.sheetView[0] = SheetView(**renderer.sheet_view_options)
+
         # Write-only worksheets serialize column dimensions with the first row,
         # so configure widths before appending any rows.
         column_width = column_header.get("column_width", 20)
@@ -257,10 +261,6 @@ class XLSXStreamingMixin:
             last_column = get_column_letter(len(headers))
 
             worksheet.auto_filter.ref = f"A{header_row}:{last_column}{last_row}"
-
-        # Preserve the existing worksheet view configuration.
-        if renderer.sheet_view_options:
-            worksheet.views.sheetView[0] = SheetView(**renderer.sheet_view_options)
 
         # Generate the XLSX archive into a temporary disk-backed file.
         temporary_file = TemporaryFile(mode="w+b")
