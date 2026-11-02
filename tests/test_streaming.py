@@ -347,7 +347,12 @@ def test_streaming_export_requires_queryset_iterator(api_client, monkeypatch):
 
 
 def test_streaming_export_rejects_header_images(api_client, monkeypatch):
-    monkeypatch.setattr(ExampleViewSet, "header", {"img": "unused.png"}, raising=False)
+    monkeypatch.setattr(
+        ExampleViewSet,
+        "header",
+        {"img": "unused.png"},
+        raising=False,
+    )
 
     with pytest.raises(NotImplementedError, match="Images in the XLSX header"):
         api_client.get("/examples/export-xlsx/")
@@ -462,7 +467,12 @@ def test_streaming_export_handles_custom_columns_and_mappings(
         {"title": lambda value: value.upper()},
         raising=False,
     )
-    monkeypatch.setattr(ExampleViewSet, "xlsx_specify_headers", ["title", "extra"], raising=False)
+    monkeypatch.setattr(
+        ExampleViewSet,
+        "xlsx_specify_headers",
+        ["title", "extra"],
+        raising=False,
+    )
     monkeypatch.setattr(ExampleViewSet, "xlsx_ignore_headers", [], raising=False)
 
     response = api_client.get("/examples/export-xlsx/")
@@ -528,7 +538,7 @@ def test_streaming_export_closes_temporary_file_when_save_fails(
         raise OSError("disk write failed")
 
     monkeypatch.setattr(
-        streaming_module, "TemporaryFile", lambda **kwargs: temporary_file
+        streaming_module, "TemporaryFile", lambda **kwargs: temporary_file,
         raising=False,
     )
     monkeypatch.setattr(Workbook, "save", fail_save, raising=False)
