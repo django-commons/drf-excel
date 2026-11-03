@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from drf_excel.renderers import XLSXRenderer
 from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
+
 class XLSXFileMixin:
     """
     Mixin which allows the override of the filename being
