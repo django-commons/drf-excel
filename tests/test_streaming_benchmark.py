@@ -51,11 +51,19 @@ def _consume_response(client, path):
 def _isolated_export_worker(send_conn, path):
     """Run one export in a child process and report its baseline and output."""
     import psutil
+    from django.conf import settings
     from django.db import connections
     from rest_framework.test import APIClient
 
-    # A fork inherits the parent's connection state; never reuse it.
-    connections.close_all()
+    # For the in-memory SQLite test database, the fork must retain the
+    # inherited connection or it would see a brand-new, empty database.
+    # Other database backends get a fresh connection in the child.
+    database = settings.DATABASES["default"]
+    keep_inherited_sqlite = (
+        database["ENGINE"].endswith("sqlite3") and database["NAME"] == ":memory:"
+    )
+    if not keep_inherited_sqlite:
+        connections.close_all()
     gc.collect()
     process = psutil.Process(os.getpid())
     baseline_rss = process.memory_info().rss
@@ -68,7 +76,8 @@ def _isolated_export_worker(send_conn, path):
         send_conn.send(("error", repr(exc)))
         raise
     finally:
-        connections.close_all()
+        if not keep_inherited_sqlite:
+            connections.close_all()
         send_conn.close()
 
 
