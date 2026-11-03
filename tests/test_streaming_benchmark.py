@@ -51,11 +51,11 @@ def _consume_response(client, path):
 def _isolated_export_worker(send_conn, path):
     """Run one export in a child process and report its baseline and output."""
     import psutil
-    from django.db import close_old_connections
+    from django.db import connections
     from rest_framework.test import APIClient
 
     # A fork inherits the parent's connection state; never reuse it.
-    close_old_connections()
+    connections.close_all()
     gc.collect()
     process = psutil.Process(os.getpid())
     baseline_rss = process.memory_info().rss
@@ -68,7 +68,7 @@ def _isolated_export_worker(send_conn, path):
         send_conn.send(("error", repr(exc)))
         raise
     finally:
-        close_old_connections()
+        connections.close_all()
         send_conn.close()
 
 
