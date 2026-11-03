@@ -1,29 +1,29 @@
-"""Opt-in RSS comparison for the regular and streaming XLSX exporters.
+"""Opt-in isolated-process RSS comparison for XLSX exporters.
 
 Run with:
     DRF_EXCEL_RUN_MEMORY_BENCHMARK=1 pytest -s tests/test_streaming_benchmark.py
 
-The benchmark is intentionally excluded from the normal test suite because RSS
-measurements are environment-dependent and should not make CI flaky.
+Each measurement runs in a fresh forked process. This prevents allocations
+retained by one exporter from contaminating the next exporter's measurement.
 """
 
 import gc
+import multiprocessing
 import os
-import threading
+import time
 from statistics import median
 
 import psutil
 import pytest
-from rest_framework.test import APIClient
 
 from tests.testapp.models import ExampleModel
 
-pytestmark = pytest.mark.django_db
+pytestmark = pytest.mark.django_db(transaction=True)
 
 RUN_BENCHMARK = os.getenv("DRF_EXCEL_RUN_MEMORY_BENCHMARK") == "1"
 RECORD_COUNT = int(os.getenv("DRF_EXCEL_BENCHMARK_ROWS", "20000"))
-REPETITIONS = int(os.getenv("DRF_EXCEL_BENCHMARK_REPETITIONS", "3"))
-SAMPLE_INTERVAL = 0.001
+REPETITIONS = int(os.getenv("DRF_EXCEL_BENCHMARK_REPETITIONS", "5"))
+SAMPLE_INTERVAL = 0.002
 
 
 def _consume_response(client, path):
@@ -48,34 +48,89 @@ def _consume_response(client, path):
     return byte_count
 
 
-def _measure_peak_rss(client, path):
-    """Return the sampled RSS increase while requesting and consuming an XLSX."""
-    process = psutil.Process(os.getpid())
+def _isolated_export_worker(send_conn, path):
+    """Run one export in a child process and report its baseline and output."""
+    import psutil
+    from django.db import close_old_connections
+    from rest_framework.test import APIClient
+
+    # A fork inherits the parent's connection state; never reuse it.
+    close_old_connections()
     gc.collect()
-    baseline = process.memory_info().rss
-    peak = baseline
-    finished = threading.Event()
-
-    def sample_rss():
-        nonlocal peak
-        while not finished.is_set():
-            try:
-                peak = max(peak, process.memory_info().rss)
-            except psutil.Error:
-                return
-            finished.wait(SAMPLE_INTERVAL)
-
-    sampler = threading.Thread(target=sample_rss, daemon=True)
-    sampler.start()
+    process = psutil.Process(os.getpid())
+    baseline_rss = process.memory_info().rss
+    send_conn.send(("ready", baseline_rss))
 
     try:
-        byte_count = _consume_response(client, path)
+        byte_count = _consume_response(APIClient(), path)
+        send_conn.send(("result", byte_count))
+    except BaseException as exc:
+        send_conn.send(("error", repr(exc)))
+        raise
     finally:
-        finished.set()
-        sampler.join()
+        close_old_connections()
+        send_conn.close()
 
-    peak = max(peak, process.memory_info().rss)
-    return max(0, peak - baseline), byte_count
+
+def _measure_isolated_peak_rss(path):
+    """Return (peak RSS, baseline RSS, output bytes) from a fresh process."""
+    if "fork" not in multiprocessing.get_all_start_methods():
+        pytest.skip("The isolated RSS benchmark currently requires fork support.")
+
+    context = multiprocessing.get_context("fork")
+    recv_conn, send_conn = context.Pipe(duplex=False)
+    worker = context.Process(target=_isolated_export_worker, args=(send_conn, path))
+    worker.start()
+    send_conn.close()
+
+    try:
+        if not recv_conn.poll(30):
+            worker.terminate()
+            worker.join()
+            pytest.fail(f"Benchmark worker did not initialize for {path}")
+
+        status, baseline_rss = recv_conn.recv()
+        if status != "ready":
+            pytest.fail(f"Unexpected benchmark worker message: {status}")
+
+        process = psutil.Process(worker.pid)
+        peak_rss = baseline_rss
+        result = None
+
+        while worker.is_alive():
+            try:
+                peak_rss = max(peak_rss, process.memory_info().rss)
+            except psutil.NoSuchProcess:
+                break
+
+            if recv_conn.poll():
+                message = recv_conn.recv()
+                if message[0] == "result":
+                    result = message[1]
+                    # Keep sampling until the worker exits.
+                elif message[0] == "error":
+                    pytest.fail(f"Benchmark worker failed for {path}: {message[1]}")
+            time.sleep(SAMPLE_INTERVAL)
+
+        worker.join()
+        if result is None and recv_conn.poll():
+            message = recv_conn.recv()
+            if message[0] == "result":
+                result = message[1]
+            elif message[0] == "error":
+                pytest.fail(f"Benchmark worker failed for {path}: {message[1]}")
+
+        if worker.exitcode != 0:
+            pytest.fail(f"Benchmark worker exited with code {worker.exitcode}")
+        if result is None:
+            pytest.fail(f"Benchmark worker returned no result for {path}")
+
+        return peak_rss, baseline_rss, result
+    finally:
+        recv_conn.close()
+        if worker.is_alive():
+            worker.terminate()
+            worker.join()
 
 
 @pytest.mark.skipif(
@@ -83,7 +138,7 @@ def _measure_peak_rss(client, path):
     reason="Set DRF_EXCEL_RUN_MEMORY_BENCHMARK=1 to run the opt-in RSS benchmark.",
 )
 def test_compare_regular_and_streaming_export_peak_rss():
-    """Compare both endpoints against the same persisted queryset."""
+    """Compare both endpoints against the same committed queryset."""
     if RECORD_COUNT < 1 or REPETITIONS < 1:
         pytest.fail("Benchmark rows and repetitions must both be positive.")
 
@@ -98,52 +153,39 @@ def test_compare_regular_and_streaming_export_peak_rss():
         batch_size=1000,
     )
 
-    api_client = APIClient()
     endpoints = {
         "regular": "/examples/?format=xlsx",
         "streaming": "/examples/export-xlsx/",
     }
-
-    # Warm up imports, serializers, database connections, and OpenPyXL.
-    for path in endpoints.values():
-        _consume_response(api_client, path)
-
     results = {name: [] for name in endpoints}
 
+    # Every sample gets a new worker process. Alternate order to reduce
+    # systematic effects from database/cache state across repetitions.
     for repetition in range(REPETITIONS):
-        # Alternate order to reduce systematic bias from always running one
-        # implementation first and retaining its allocations in the process.
         order = (
             ("regular", "streaming")
             if repetition % 2 == 0
             else ("streaming", "regular")
         )
         for name in order:
-            gc.collect()
-            peak_delta, byte_count = _measure_peak_rss(
-                api_client,
-                endpoints[name],
-            )
-            results[name].append((peak_delta, byte_count))
+            results[name].append(_measure_isolated_peak_rss(endpoints[name]))
 
-    regular_median = median(value[0] for value in results["regular"])
-    streaming_median = median(value[0] for value in results["streaming"])
-
-    print("\nPeak RSS comparison (sampled process RSS increase)")
+    print("\nIsolated-process Peak RSS comparison")
     print(f"Records: {RECORD_COUNT:,}; repetitions: {REPETITIONS}")
-    print(f"Regular renderer:  {regular_median / (1024 * 1024):.2f} MiB")
-    print(f"Streaming exporter: {streaming_median / (1024 * 1024):.2f} MiB")
-
-    if regular_median > 0:
-        reduction = (regular_median - streaming_median) / regular_median * 100
-        print(f"Sampled RSS reduction: {reduction:.1f}%")
-
     for name in endpoints:
-        sizes = [value[1] for value in results[name]]
-        print(
-            f"{name} XLSX output size: "
-            f"{median(sizes) / (1024 * 1024):.2f} MiB"
-        )
+        peak = median(sample[0] for sample in results[name])
+        baseline = median(sample[1] for sample in results[name])
+        growth = median(sample[0] - sample[1] for sample in results[name])
+        output_size = median(sample[2] for sample in results[name])
+        print(f"{name.title()} peak RSS: {peak / (1024 * 1024):.2f} MiB")
+        print(f"{name.title()} baseline RSS: {baseline / (1024 * 1024):.2f} MiB")
+        print(f"{name.title()} peak RSS increase: {growth / (1024 * 1024):.2f} MiB")
+        print(f"{name.title()} XLSX output size: {output_size / (1024 * 1024):.2f} MiB")
 
-    # Deliberately no memory-ratio assertion: RSS depends on allocator,
-    # operating system, Python/OpenPyXL versions, and sampling timing.
+    regular_growth = median(sample[0] - sample[1] for sample in results["regular"])
+    streaming_growth = median(sample[0] - sample[1] for sample in results["streaming"])
+    if regular_growth > 0:
+        reduction = (regular_growth - streaming_growth) / regular_growth * 100
+        print(f"Peak RSS increase reduction: {reduction:.1f}%")
+
+    # No performance threshold assertion: RSS is environment-dependent.
