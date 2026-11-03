@@ -10,7 +10,6 @@ measurements are environment-dependent and should not make CI flaky.
 import gc
 import os
 import threading
-import time
 from statistics import median
 
 import psutil
@@ -83,7 +82,7 @@ def _measure_peak_rss(client, path):
     not RUN_BENCHMARK,
     reason="Set DRF_EXCEL_RUN_MEMORY_BENCHMARK=1 to run the opt-in RSS benchmark.",
 )
-def test_compare_regular_and_streaming_export_peak_rss(api_client: APIClient):
+def test_compare_regular_and_streaming_export_peak_rss():
     """Compare both endpoints against the same persisted queryset."""
     if RECORD_COUNT < 1 or REPETITIONS < 1:
         pytest.fail("Benchmark rows and repetitions must both be positive.")
@@ -99,6 +98,7 @@ def test_compare_regular_and_streaming_export_peak_rss(api_client: APIClient):
         batch_size=1000,
     )
 
+    api_client = APIClient()
     endpoints = {
         "regular": "/examples/?format=xlsx",
         "streaming": "/examples/export-xlsx/",
@@ -110,10 +110,15 @@ def test_compare_regular_and_streaming_export_peak_rss(api_client: APIClient):
 
     results = {name: [] for name in endpoints}
 
-    for _ in range(REPETITIONS):
+    for repetition in range(REPETITIONS):
         # Alternate order to reduce systematic bias from always running one
         # implementation first and retaining its allocations in the process.
-        for name in ("regular", "streaming"):
+        order = (
+            ("regular", "streaming")
+            if repetition % 2 == 0
+            else ("streaming", "regular")
+        )
+        for name in order:
             gc.collect()
             peak_delta, byte_count = _measure_peak_rss(
                 api_client,
