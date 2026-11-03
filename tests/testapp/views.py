@@ -3,7 +3,7 @@ from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from drf_excel.mixins import XLSXFileMixin
 from drf_excel.renderers import XLSXRenderer
-from drf_excel.streaming import XLSXStreamingMixin
+from drf_excel.mixins import XLSXFileMixin, XLSXStreamingMixin
 
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
 from .serializers import (
