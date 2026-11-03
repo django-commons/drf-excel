@@ -8,7 +8,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField, DateTimeField, IntegerField
 from rest_framework.test import APIClient
 
-from drf_excel import streaming as streaming_module
+from drf_excel import mixins as streaming_module
 from drf_excel.fields import XLSXDateField, XLSXField, XLSXNumberField
 from drf_excel.utilities import XLSXStyle
 from tests.testapp.models import ExampleModel
