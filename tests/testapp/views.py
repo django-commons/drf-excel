@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
-from drf_excel.mixins import XLSXFileMixin
+from drf_excel.mixins import XLSXFileMixin, XLSXStreamingMixin
 from drf_excel.renderers import XLSXRenderer
 
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
@@ -14,7 +14,11 @@ from .serializers import (
 )
 
 
-class ExampleViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+class ExampleViewSet(
+    XLSXFileMixin,
+    XLSXStreamingMixin,
+    ReadOnlyModelViewSet,
+):
     queryset = ExampleModel.objects.all()
     serializer_class = ExampleSerializer
     renderer_classes = (XLSXRenderer,)
@@ -64,11 +68,17 @@ class NestedViewSet(XLSXFileMixin, GenericViewSet):
             [
                 {
                     "title": "Post 1",
-                    "author": {"name": "Alice", "email": "alice@example.com"},
+                    "author": {
+                        "name": "Alice",
+                        "email": "alice@example.com",
+                    },
                 },
                 {
                     "title": "Post 2",
-                    "author": {"name": "Bob", "email": "bob@example.com"},
+                    "author": {
+                        "name": "Bob",
+                        "email": "bob@example.com",
+                    },
                 },
             ]
         )
@@ -82,12 +92,23 @@ class CustomColsViewSet(XLSXFileMixin, GenericViewSet):
     serializer_class = ExampleSerializer
     renderer_classes = (XLSXRenderer,)
     filename = "custom_cols.xlsx"
+
     xlsx_custom_cols = {
-        "extra": {"label": "Extra Column", "formatter": lambda row: "computed"},
+        "extra": {
+            "label": "Extra Column",
+            "formatter": lambda row: "computed",
+        },
     }
 
     def list(self, request, *args, **kwargs):
-        return Response([{"title": "test", "description": "desc"}])
+        return Response(
+            [
+                {
+                    "title": "test",
+                    "description": "desc",
+                }
+            ]
+        )
 
     def get_serializer(self, *args, **kwargs):
         return ExampleSerializer()
@@ -97,6 +118,7 @@ class ColumnTitlesViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     queryset = ExampleModel.objects.all()
     serializer_class = ExampleSerializer
     renderer_classes = (XLSXRenderer,)
+
     column_header = {
         "titles": ["Title Override", "Description Override"],
     }
@@ -106,6 +128,7 @@ class ColumnWidthListViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     queryset = ExampleModel.objects.all()
     serializer_class = ExampleSerializer
     renderer_classes = (XLSXRenderer,)
+
     column_header = {
         "column_width": [10, 30],
     }
@@ -119,7 +142,11 @@ class RowColorViewSet(XLSXFileMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         return Response(
             [
-                {"title": "colored", "description": "row", "row_color": "FF0000"},
+                {
+                    "title": "colored",
+                    "description": "row",
+                    "row_color": "FF0000",
+                },
             ]
         )
 
@@ -152,7 +179,7 @@ class SpecifyHeadersViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
 
 class SpecifyHeadersOrderViewSet(SpecifyHeadersViewSet):
     # Declared in a different order than the serializer, and with a field that
-    # doesn't exist on the serializer
+    # doesn't exist on the serializer.
     xlsx_specify_headers = ["age", "title", "does_not_exist"]
 
 
@@ -162,10 +189,10 @@ class SpecifyAndIgnoreHeadersViewSet(SpecifyHeadersViewSet):
 
 
 class SpecifyNestedHeadersViewSet(NestedViewSet):
-    # Nested field addressed with a dotted path
+    # Nested field addressed with a dotted path.
     xlsx_specify_headers = ["title", "author.name"]
 
 
 class SpecifyNestedParentHeaderViewSet(NestedViewSet):
-    # Nested serializer addressed by its own key
+    # Nested serializer addressed by its own key.
     xlsx_specify_headers = ["author"]

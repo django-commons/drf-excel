@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.utils.dateparse import parse_date, parse_datetime, parse_time
-from openpyxl.cell import Cell
+from openpyxl.cell import Cell, WriteOnlyCell
 from openpyxl.styles.numbers import (
     FORMAT_DATE_DATETIME,
     FORMAT_DATE_TIME4,
@@ -71,11 +71,36 @@ class XLSXField:
         value = self.custom_mapping() if self.mapping else self.prep_value()
         if self.sanitize:
             value = sanitize_value(value)
+
         cell: Cell = ws.cell(row, column, value)
         self.prep_cell(cell)
+
         # Provided cell style always has priority
         if self.cell_style:
             set_cell_style(cell, self.cell_style)
+
+        return cell
+
+    def write_only_cell(self, ws: Worksheet) -> Cell:
+        """
+        Create a cell compatible with an OpenPyXL write-only worksheet.
+
+        Write-only worksheets do not support the regular ws.cell(row, column)
+        API. WriteOnlyCell allows values and styles to be assigned before
+        appending the complete row to the worksheet.
+        """
+        value = self.custom_mapping() if self.mapping else self.prep_value()
+
+        if self.sanitize:
+            value = sanitize_value(value)
+
+        cell = WriteOnlyCell(ws, value=value)
+        self.prep_cell(cell)
+
+        # Provided cell style always has priority
+        if self.cell_style:
+            set_cell_style(cell, self.cell_style)
+
         return cell
 
 
@@ -100,6 +125,7 @@ class XLSXNumberField(XLSXField):
 
     def prep_cell(self, cell: Cell):
         super().prep_cell(cell)
+
         if isinstance(self.drf_field, IntegerField):
             cell.number_format = get_setting("INTEGER_FORMAT") or FORMAT_NUMBER
         else:
@@ -115,15 +141,20 @@ class XLSXDateField(XLSXField):
     def _parse_date(self, value, setting_format, iso_parse_func):
         # Parse format is Field format if provided.
         drf_format = getattr(self.drf_field, "format", None)
+
         # Otherwise, use DRF output format: DATETIME_FORMAT, DATE_FORMAT or TIME_FORMAT
         parse_format = drf_format or getattr(drf_settings, setting_format)
+
         if parse_format.lower() == ISO_8601:
             return iso_parse_func(value)
+
         parsed_datetime = datetime.datetime.strptime(value, parse_format)
+
         if isinstance(self.drf_field, TimeField):
             return parsed_datetime.time()
         elif isinstance(self.drf_field, DateField):
             return parsed_datetime.date()
+
         return parsed_datetime
 
     def init_value(self, value):
@@ -150,10 +181,12 @@ class XLSXDateField(XLSXField):
                 )
         except Exception:
             pass
+
         return value
 
     def prep_cell(self, cell: Cell):
         super().prep_cell(cell)
+
         if isinstance(self.drf_field, DateTimeField):
             cell.number_format = get_setting("DATETIME_FORMAT") or FORMAT_DATE_DATETIME
         elif isinstance(self.drf_field, DateField):
@@ -170,6 +203,7 @@ class XLSXListField(XLSXField):
     def prep_value(self) -> Any:
         if self.value is None:
             return super().prep_value()
+
         if (
             len(self.value) > 0
             and isinstance(self.value[0], Iterable)
@@ -192,6 +226,8 @@ class XLSXBooleanField(XLSXField):
 
     def prep_value(self) -> Any:
         boolean_display = self.boolean_display or get_setting("BOOLEAN_DISPLAY")
+
         if boolean_display:
             return str(boolean_display.get(self.value, self.value))
+
         return self.value
