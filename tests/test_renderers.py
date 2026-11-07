@@ -1,3 +1,6 @@
+import datetime as dt
+from decimal import Decimal
+
 from django.utils.translation import gettext_lazy as _
 from PIL import Image
 from rest_framework import serializers
@@ -195,3 +198,64 @@ class TestXLSXRenderer:
         assert len(rows) == 2
         assert rows[0][0].value == "title"
         assert rows[1][0].value == "test"
+
+    def test_render_method_and_readonly_fields(self, workbook_reader):
+        """
+        Verify that SerializerMethodField and ReadOnlyField values are mapped
+        to their native Excel cell types (numbers, booleans, dates) rather than
+        falling back to text strings.
+        """
+
+        class TypedMethodSerializer(serializers.Serializer):
+            count = serializers.SerializerMethodField()
+            price = serializers.ReadOnlyField()
+            is_active = serializers.SerializerMethodField()
+            created_at = serializers.SerializerMethodField()
+            title = serializers.CharField()
+
+            def get_count(self, obj):
+                return 42
+
+            def get_is_active(self, obj):
+                return True
+
+            def get_created_at(self, obj):
+                return dt.date(2026, 11, 8)
+
+        class TypedView(MyBaseView):
+            header = {"use_header": False}
+
+            @staticmethod
+            def get_serializer(*args, **kwargs):
+                return TypedMethodSerializer()
+
+        serializer = TypedMethodSerializer(
+            {"price": Decimal("19.99"), "title": "Widget"}
+        )
+        result = self.renderer.render(
+            [serializer.data],
+            renderer_context={"view": TypedView},
+        )
+        wb = workbook_reader(result, read_only=False)
+        sheet = wb.worksheets[0]
+
+        headers = [sheet.cell(1, col).value for col in range(1, 6)]
+        cells = {headers[col - 1]: sheet.cell(2, col) for col in range(1, 6)}
+
+        assert cells["count"].data_type == "n"
+        assert cells["count"].value == 42
+        assert cells["count"].number_format == "0"
+
+        assert cells["price"].data_type == "n"
+        assert cells["price"].value == 19.99
+        assert cells["price"].number_format == "0.00"
+
+        assert cells["is_active"].data_type == "b"
+        assert cells["is_active"].value is True
+
+        assert cells["created_at"].data_type == "d"
+        assert cells["created_at"].value == dt.datetime(2026, 11, 8, 0, 0)
+        assert cells["created_at"].number_format == "yyyy-mm-dd"
+
+        assert cells["title"].data_type == "s"
+        assert cells["title"].value == "Widget"
