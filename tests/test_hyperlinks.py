@@ -61,6 +61,9 @@ class TestXLSXHyperlinkField:
 
 
 class TestXLSXHyperlinkMixin:
+    def test_default_get_cell_hyperlink_returns_none(self):
+        assert XLSXHyperlinkMixin().get_cell_hyperlink({}, "website") is None
+
     def test_get_cell_hyperlink(self):
         view = HyperlinkView()
         assert (
