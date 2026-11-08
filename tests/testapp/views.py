@@ -1,7 +1,11 @@
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
-from drf_excel.mixins import XLSXFileMixin, XLSXStreamingMixin
+from drf_excel.mixins import (
+    XLSXFileMixin,
+    XLSXStreamingMixin,
+    XLSXHyperlinkMixin,
+)
 from drf_excel.renderers import XLSXRenderer
 
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
@@ -178,8 +182,6 @@ class SpecifyHeadersViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
 
 
 class SpecifyHeadersOrderViewSet(SpecifyHeadersViewSet):
-    # Declared in a different order than the serializer, and with a field that
-    # doesn't exist on the serializer.
     xlsx_specify_headers = ["age", "title", "does_not_exist"]
 
 
@@ -189,10 +191,25 @@ class SpecifyAndIgnoreHeadersViewSet(SpecifyHeadersViewSet):
 
 
 class SpecifyNestedHeadersViewSet(NestedViewSet):
-    # Nested field addressed with a dotted path.
     xlsx_specify_headers = ["title", "author.name"]
 
 
 class SpecifyNestedParentHeaderViewSet(NestedViewSet):
-    # Nested serializer addressed by its own key.
     xlsx_specify_headers = ["author"]
+
+
+class HyperlinkViewSet(
+    XLSXHyperlinkMixin,
+    XLSXFileMixin,
+    ReadOnlyModelViewSet,
+):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "hyperlinks.xlsx"
+
+    def get_cell_hyperlink(self, row, column):
+        if column == "title":
+            return "https://example.com"
+
+        return None

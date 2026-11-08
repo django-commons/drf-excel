@@ -41,6 +41,7 @@ class XLSXField:
         style: XLSXStyle,
         mapping: str | Callable,
         cell_style: XLSXStyle,
+        hyperlink: str | None = None,
     ):
         self.key = key
         self.original_value = value
@@ -48,6 +49,7 @@ class XLSXField:
         self.style = style
         self.mapping = mapping
         self.cell_style = cell_style
+        self.hyperlink = hyperlink
         self.value = self.init_value(value)
 
     def init_value(self, value):
@@ -67,7 +69,6 @@ class XLSXField:
         set_cell_style(cell, self.style)
 
     def cell(self, ws: Worksheet, row, column) -> Cell:
-        # If we have a custom mapping use it and done. If not prep value for output
         value = self.custom_mapping() if self.mapping else self.prep_value()
         if self.sanitize:
             value = sanitize_value(value)
@@ -75,20 +76,15 @@ class XLSXField:
         cell: Cell = ws.cell(row, column, value)
         self.prep_cell(cell)
 
-        # Provided cell style always has priority
         if self.cell_style:
             set_cell_style(cell, self.cell_style)
+
+        if self.hyperlink:
+            cell.hyperlink = self.hyperlink
 
         return cell
 
     def write_only_cell(self, ws: Worksheet) -> Cell:
-        """
-        Create a cell compatible with an OpenPyXL write-only worksheet.
-
-        Write-only worksheets do not support the regular ws.cell(row, column)
-        API. WriteOnlyCell allows values and styles to be assigned before
-        appending the complete row to the worksheet.
-        """
         value = self.custom_mapping() if self.mapping else self.prep_value()
 
         if self.sanitize:
@@ -97,9 +93,11 @@ class XLSXField:
         cell = WriteOnlyCell(ws, value=value)
         self.prep_cell(cell)
 
-        # Provided cell style always has priority
         if self.cell_style:
             set_cell_style(cell, self.cell_style)
+
+        if self.hyperlink:
+            cell.hyperlink = self.hyperlink
 
         return cell
 
@@ -139,10 +137,7 @@ class XLSXDateField(XLSXField):
         super().__init__(**kwargs)
 
     def _parse_date(self, value, setting_format, iso_parse_func):
-        # Parse format is Field format if provided.
         drf_format = getattr(self.drf_field, "format", None)
-
-        # Otherwise, use DRF output format: DATETIME_FORMAT, DATE_FORMAT or TIME_FORMAT
         parse_format = drf_format or getattr(drf_settings, setting_format)
 
         if parse_format.lower() == ISO_8601:
@@ -158,7 +153,6 @@ class XLSXDateField(XLSXField):
         return parsed_datetime
 
     def init_value(self, value):
-        # Set tzinfo to None on datetime and time types since timezones are not supported in Excel
         try:
             if (
                 isinstance(self.drf_field, DateTimeField)
@@ -209,11 +203,8 @@ class XLSXListField(XLSXField):
             and isinstance(self.value[0], Iterable)
             and not isinstance(self.value[0], str)
         ):
-            # array of array; write as json
             return json.dumps(self.value, ensure_ascii=False)
         else:
-            # Flatten the array into a comma separated string to fit
-            # in a single spreadsheet column
             return self.list_sep.join(map(str, self.value))
 
 

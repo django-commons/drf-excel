@@ -15,24 +15,12 @@ from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
 
 class XLSXFileMixin:
-    """
-    Mixin which allows the override of the filename being
-    passed back to the user when the spreadsheet is downloaded.
-    """
-
     filename = "export.xlsx"
 
     def get_filename(self, request=None, *args, **kwargs):
-        """
-        Returns a custom filename for the spreadsheet.
-        """
         return self.filename
 
     def finalize_response(self, request, response, *args, **kwargs):
-        """
-        Return the response with the proper content disposition and the customized
-        filename instead of the browser default (or lack thereof).
-        """
         response = super().finalize_response(request, response, *args, **kwargs)
         if (
             isinstance(response, Response)
@@ -45,15 +33,25 @@ class XLSXFileMixin:
         return response
 
 
+class XLSXHyperlinkMixin:
+    def get_cell_hyperlink(self, row, column):
+        return None
+
+    def _get_cell_hyperlink(self, row, column):
+        hyperlink = self.get_cell_hyperlink(row, column)
+
+        if hyperlink is None:
+            return None
+
+        if not isinstance(hyperlink, str):
+            raise TypeError(
+                "get_cell_hyperlink() must return a string or None."
+            )
+
+        return hyperlink or None
+
+
 class XLSXStreamingMixin:
-    """
-    Adds an opt-in XLSX export action that processes queryset records
-    incrementally and writes worksheet rows in write-only mode.
-
-    The export includes all records returned by get_queryset() after
-    filter_queryset() is applied. Pagination is intentionally bypassed.
-    """
-
     xlsx_iterator_chunk_size = 2000
 
     @action(
@@ -63,15 +61,12 @@ class XLSXStreamingMixin:
         url_name="export-xlsx",
     )
     def export_xlsx(self, request, *args, **kwargs):
-        """
-        Export the filtered queryset without materializing all records
-        or worksheet cells in memory.
-        """
         queryset = self.filter_queryset(self.get_queryset())
 
         if not callable(getattr(queryset, "iterator", None)):
             raise TypeError(
-                "XLSX streaming export requires a queryset " "that supports iterator()."
+                "XLSX streaming export requires a queryset "
+                "that supports iterator()."
             )
 
         chunk_size = self.xlsx_iterator_chunk_size
@@ -82,8 +77,6 @@ class XLSXStreamingMixin:
         if chunk_size <= 0:
             raise ValueError("xlsx_iterator_chunk_size must be a positive integer.")
 
-        # Build serializer metadata once. Each model instance is serialized
-        # separately inside the iterator loop below.
         serializer = self.get_serializer()
 
         renderer = XLSXRenderer()
@@ -99,10 +92,6 @@ class XLSXStreamingMixin:
         )
 
     def _configure_renderer(self, renderer, serializer):
-        """
-        Reuse the existing renderer's serializer and field-flattening logic
-        so streaming exports follow the regular XLSX field conventions.
-        """
         renderer.specify_headers = getattr(self, "xlsx_specify_headers", None)
         renderer.ignore_headers = getattr(self, "xlsx_ignore_headers", [])
         renderer.boolean_display = getattr(self, "xlsx_boolean_labels", None)
@@ -117,6 +106,10 @@ class XLSXStreamingMixin:
         renderer.fields_dict = renderer._serializer_fields(serializer)
 
         renderer.list_sep = getattr(renderer, "list_sep", ", ")
+
+        renderer.hyperlink_getter = getattr(
+            self, "_get_cell_hyperlink", None
+        )
 
         use_labels = getattr(self, "xlsx_use_labels", False)
 
@@ -155,16 +148,10 @@ class XLSXStreamingMixin:
         *args,
         **kwargs,
     ):
-        """
-        Build the XLSX workbook one row at a time and return it as a
-        disk-backed FileResponse.
-        """
         header = get_attribute(self, "header", {}) or {}
         column_header = get_attribute(self, "column_header", {}) or {}
         body = get_attribute(self, "body", {}) or {}
 
-        # Write-only worksheets do not support the regular image API.
-        # Fail explicitly rather than silently generating an incomplete export.
         if header.get("img"):
             raise NotImplementedError(
                 "Images in the XLSX header are not supported "
@@ -179,12 +166,9 @@ class XLSXStreamingMixin:
 
         worksheet = workbook.create_sheet(title=header.get("tab_title", "Report"))
 
-        # Write-only worksheets serialize view settings with the first row.
         if renderer.sheet_view_options:
             worksheet.views.sheetView[0] = SheetView(**renderer.sheet_view_options)
 
-        # Write-only worksheets serialize column dimensions with the first row,
-        # so configure widths before appending any rows.
         column_width = column_header.get("column_width", 20)
 
         for index in range(len(headers)):
@@ -200,8 +184,6 @@ class XLSXStreamingMixin:
 
         current_row = 1
 
-        # Write the report title, if configured.
-        # Write-only worksheets do not support merged cells.
         if use_header:
             title_cell = WriteOnlyCell(
                 worksheet,
@@ -216,8 +198,6 @@ class XLSXStreamingMixin:
             worksheet.append([title_cell])
             current_row += 1
 
-        # Keep the original renderer's column order and omit row_color,
-        # which is a row-level formatting field rather than a data column.
         column_titles = column_header.get("titles", [])
 
         column_style = (
@@ -239,7 +219,6 @@ class XLSXStreamingMixin:
 
             header_cells.append(cell)
 
-        # Always write column headers, including for an empty queryset.
         header_row = current_row
 
         if header_cells:
@@ -252,8 +231,6 @@ class XLSXStreamingMixin:
 
         auto_filter = get_attribute(self, "xlsx_auto_filter", False)
 
-        # iterator() avoids QuerySet's normal result cache.
-        # Serialize and append one record at a time.
         records = queryset.iterator(chunk_size=chunk_size)
 
         for instance in records:
@@ -266,13 +243,17 @@ class XLSXStreamingMixin:
                 field = flattened_row.get(key)
 
                 if field is not None:
+                    if renderer.hyperlink_getter:
+                        field.hyperlink = renderer.hyperlink_getter(
+                            row_data, key
+                        )
+
                     cell = field.write_only_cell(worksheet)
                 else:
                     cell = WriteOnlyCell(worksheet, value=None)
 
                 cells.append(cell)
 
-            # Preserve the existing row_color behavior.
             row_color = row_data.get("row_color")
 
             if row_color and cells:
@@ -295,7 +276,6 @@ class XLSXStreamingMixin:
 
             worksheet.auto_filter.ref = f"A{header_row}:{last_column}{last_row}"
 
-        # Generate the XLSX archive into a temporary disk-backed file.
         temporary_file = TemporaryFile(mode="w+b")
 
         try:
@@ -305,7 +285,6 @@ class XLSXStreamingMixin:
             temporary_file.close()
             raise
 
-        # Reuse XLSXFileMixin.get_filename() when available.
         filename_getter = getattr(self, "get_filename", None)
 
         if callable(filename_getter):
