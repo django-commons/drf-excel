@@ -3,8 +3,8 @@ from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from drf_excel.mixins import (
     XLSXFileMixin,
-    XLSXStreamingMixin,
     XLSXHyperlinkMixin,
+    XLSXStreamingMixin,
 )
 from drf_excel.renderers import XLSXRenderer
 
