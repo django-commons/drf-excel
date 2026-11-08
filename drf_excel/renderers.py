@@ -62,9 +62,7 @@ class XLSXRenderer(BaseRenderer):
         results = data["results"] if "results" in data else data
 
         drf_view = renderer_context.get("view")
-        self.hyperlink_getter = getattr(
-            drf_view, "_get_cell_hyperlink", None
-        )
+        self.hyperlink_getter = getattr(drf_view, "_get_cell_hyperlink", None)
 
         header = get_attribute(drf_view, "header", {})
         use_header = header and header.get("use_header", True)
@@ -308,9 +306,7 @@ class XLSXRenderer(BaseRenderer):
 
         if "row_color" in row:
             last_letter = get_column_letter(column_count)
-            cell_range = self.ws[
-                f"A{row_count}":f"{last_letter}{row_count}"
-            ]
+            cell_range = self.ws[f"A{row_count}" : f"{last_letter}{row_count}"]
             fill = PatternFill(fill_type="solid", start_color=row["row_color"])
 
             for r in cell_range:
