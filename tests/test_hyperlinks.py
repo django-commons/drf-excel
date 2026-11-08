@@ -1,4 +1,3 @@
-
 import pytest
 from openpyxl import Workbook
 from rest_framework import serializers
@@ -64,17 +63,23 @@ class TestXLSXHyperlinkField:
 class TestXLSXHyperlinkMixin:
     def test_get_cell_hyperlink(self):
         view = HyperlinkView()
-        assert view._get_cell_hyperlink(
-            {"website": "https://example.com"},
-            "website",
-        ) == "https://example.com"
+        assert (
+            view._get_cell_hyperlink(
+                {"website": "https://example.com"},
+                "website",
+            )
+            == "https://example.com"
+        )
 
     def test_get_cell_hyperlink_returns_none(self):
         view = HyperlinkView()
-        assert view._get_cell_hyperlink(
-            {"title": "Example"},
-            "title",
-        ) is None
+        assert (
+            view._get_cell_hyperlink(
+                {"title": "Example"},
+                "title",
+            )
+            is None
+        )
 
     def test_get_cell_hyperlink_rejects_invalid_type(self):
         class InvalidView(XLSXHyperlinkMixin):
@@ -147,4 +152,3 @@ def test_streaming_export_adds_hyperlinks(workbook_reader, monkeypatch):
 
     assert worksheet["A2"].value == "Example"
     assert worksheet["A2"].hyperlink.target == "https://example.com"
-
