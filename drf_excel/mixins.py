@@ -44,9 +44,7 @@ class XLSXHyperlinkMixin:
             return None
 
         if not isinstance(hyperlink, str):
-            raise TypeError(
-                "get_cell_hyperlink() must return a string or None."
-            )
+            raise TypeError("get_cell_hyperlink() must return a string or None.")
 
         return hyperlink or None
 
@@ -65,8 +63,7 @@ class XLSXStreamingMixin:
 
         if not callable(getattr(queryset, "iterator", None)):
             raise TypeError(
-                "XLSX streaming export requires a queryset "
-                "that supports iterator()."
+                "XLSX streaming export requires a queryset " "that supports iterator()."
             )
 
         chunk_size = self.xlsx_iterator_chunk_size
@@ -107,9 +104,7 @@ class XLSXStreamingMixin:
 
         renderer.list_sep = getattr(renderer, "list_sep", ", ")
 
-        renderer.hyperlink_getter = getattr(
-            self, "_get_cell_hyperlink", None
-        )
+        renderer.hyperlink_getter = getattr(self, "_get_cell_hyperlink", None)
 
         use_labels = getattr(self, "xlsx_use_labels", False)
 
@@ -244,9 +239,7 @@ class XLSXStreamingMixin:
 
                 if field is not None:
                     if renderer.hyperlink_getter:
-                        field.hyperlink = renderer.hyperlink_getter(
-                            row_data, key
-                        )
+                        field.hyperlink = renderer.hyperlink_getter(row_data, key)
 
                     cell = field.write_only_cell(worksheet)
                 else:
