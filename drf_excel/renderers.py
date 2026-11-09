@@ -34,8 +34,12 @@ from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
 
 class XLSXRenderer(BaseRenderer):
+    """
+    Renderer for Excel spreadsheet open data format (xlsx).
+    """
+
     media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    format = "xlsx"
+    format = "xlsx"  # Reserved word, but required by BaseRenderer
     combined_header_dict = {}
     fields_dict = {}
     specify_headers = None
@@ -46,10 +50,13 @@ class XLSXRenderer(BaseRenderer):
     custom_cols = None
     list_sep = ", "
     body_style = None
-    sheet_view_options = {}
     hyperlink_getter = None
+    sheet_view_options = {}
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
+        """
+        Render `data` into XLSX workbook, returning a workbook.
+        """
         if data is None:
             return b""
 
@@ -64,6 +71,7 @@ class XLSXRenderer(BaseRenderer):
         drf_view = renderer_context.get("view")
         self.hyperlink_getter = getattr(drf_view, "_get_cell_hyperlink", None)
 
+        # Take header and column_header params from view
         header = get_attribute(drf_view, "header", {})
         use_header = header and header.get("use_header", True)
         self.ws.title = header.get("tab_title", "Report")
@@ -86,24 +94,70 @@ class XLSXRenderer(BaseRenderer):
         row_count = 1
         if use_header:
             row_count += 1
+        # Make column headers
         column_titles = column_header.get("titles", [])
 
+        # Check for auto_filter
         auto_filter = get_attribute(drf_view, "xlsx_auto_filter", False)
 
+        # If we have results, then flatten field names
         if len(results):
+            # Set `xlsx_use_labels = True` inside the API View to enable labels.
             use_labels = getattr(drf_view, "xlsx_use_labels", False)
 
+            # A list of header keys to use or ignore in our export
             self.specify_headers = getattr(drf_view, "xlsx_specify_headers", None)
             self.ignore_headers = getattr(drf_view, "xlsx_ignore_headers", [])
 
+            # Create a mapping dict named `xlsx_boolean_labels` inside the API View.
+            # I.e.: xlsx_boolean_labels: {True: "Yes", False: "No"}
             self.boolean_display = getattr(drf_view, "xlsx_boolean_labels", None)
 
+            # Set dict named column_data_styles with headers as keys and styles as
+            # values, I.e.:
+            # column_data_styles = {
+            #     'distance': {
+            # 	      'fill': {'fill_type': 'solid', 'start_color': 'FFCCFFCC'},
+            #         'alignment': {
+            #             'horizontal': 'center',
+            #             'vertical': 'center',
+            #             'wrapText': True, 'shrink_to_fit': True
+            #         },
+            # 	      'border_side': {'border_style': 'thin', 'color': 'FF000000'},
+            # 	      'font': {
+            #             'name': 'Arial',
+            #             'size': 14,
+            #             'bold': True,
+            #             'color': 'FF000000'
+            #         },
+            # 	      'format': '0.00E+00'
+            # 	  },
+            # }
             self.column_data_styles = get_attribute(
                 drf_view, "column_data_styles", dict()
             )
 
+            # Set dict of additional columns. Can be useful when wanting to add columns
+            # that don't exist in the API response. For example, you could want to
+            # show values of a dict in individual cols. Takes key, an optional label
+            # and value than can be callable
+            # Example:
+            # {
+            #     "Additional Col": {
+            #         label: "Something (optional)",
+            #         formatter: my_function
+            #     }
+            # }
             self.custom_cols = getattr(drf_view, "xlsx_custom_cols", dict())
 
+            # Map a specific key to a column (I.e. if the field returns a json) or pass
+            # a function to format the value
+            # Example with key:
+            # {"custom_choice": "display"}, showing 'display' in the
+            # 'custom_choice' col
+            # Example with function:
+            # {"custom_choice": custom_func }, passing the value of 'custom_choice' to
+            # 'custom_func', allowing for formatting logic
             self.custom_mappings = getattr(drf_view, "xlsx_custom_mappings", dict())
 
             self.fields_dict = self._serializer_fields(drf_view.get_serializer())
@@ -137,6 +191,7 @@ class XLSXRenderer(BaseRenderer):
                 set_cell_style(header_cell, column_header_style)
             self.ws.row_dimensions[row_count].height = column_header.get("height", 45)
 
+        # Set the header row
         if use_header:
             last_col_letter = get_column_letter(column_count) if column_count else "G"
             self.ws.merge_cells(f"A1:{last_col_letter}1")
@@ -145,6 +200,7 @@ class XLSXRenderer(BaseRenderer):
             set_cell_style(cell, header_style)
             self.ws.row_dimensions[1].height = header.get("height", 45)
 
+        # Set column width
         column_width = column_header.get("column_width", 20)
         if isinstance(column_width, list):
             for i, width in enumerate(column_width):
@@ -155,6 +211,7 @@ class XLSXRenderer(BaseRenderer):
                 col_letter = get_column_letter(ws_column)
                 self.ws.column_dimensions[col_letter].width = column_width
 
+        # Make body
         body = get_attribute(drf_view, "body", {})
         self.body_style = (
             XLSXStyle(body.get("style")) if body and "style" in body else None
@@ -166,9 +223,16 @@ class XLSXRenderer(BaseRenderer):
                 self._make_body(body, row, row_count)
                 row_count += 1
 
+        # Enable auto filters if requested
         if auto_filter and column_count:
             self.ws.auto_filter.ref = f"A1:{get_column_letter(column_count)}{row_count}"
 
+        # Set sheet view options
+        # Example:
+        # sheet_view_options = {
+        #   'rightToLeft': True,
+        #   'showGridLines': False
+        # }
         self.sheet_view_options = get_attribute(drf_view, "sheet_view_options", dict())
         self.ws.views.sheetView[0] = SheetView(**self.sheet_view_options)
 
@@ -186,6 +250,8 @@ class XLSXRenderer(BaseRenderer):
         response = (renderer_context or {}).get("response")
         if response is not None:
             return 200 <= response.status_code < 300
+        # No response available (e.g. calling the renderer directly) -
+        # fall back to the old heuristic.
         detail_key = "detail"
         return detail_key not in data
 
@@ -200,6 +266,11 @@ class XLSXRenderer(BaseRenderer):
         return _fields_dict
 
     def _is_specified(self, key, key_sep):
+        """
+        Whether `key` is selected by `xlsx_specify_headers`. A key is selected when it
+        is listed itself, when an ancestor is listed (include everything below it) or
+        when a descendant is listed (so nested serializers are traversed).
+        """
         if self.specify_headers is None:
             return True
         return any(
@@ -219,6 +290,10 @@ class XLSXRenderer(BaseRenderer):
         label_sep=" > ",
         use_labels=False,
     ):
+        """
+        Iterate through serializer fields recursively when field is a nested serializer. Skip write_only fields.
+        """
+
         def _get_label(parent_label, label_sep):
             return (
                 f"{parent_label}{label_sep}{v.label}" if parent_label else str(v.label)
@@ -228,12 +303,15 @@ class XLSXRenderer(BaseRenderer):
         _fields = serializer.fields
         for k, v in _fields.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
+            # Skip headers that weren't in the list (if present) or were specifically ignored
             if (
                 not self._is_specified(new_key, key_sep)
                 or new_key in self.ignore_headers
                 or getattr(v, "write_only", False)
             ):
                 continue
+            # Iterate through fields if field is a serializer. Check for labels and
+            # append if `use_labels` is True. Fallback to using keys.
             if isinstance(v, Serializer):
                 if use_labels and getattr(v, "label", None):
                     _header_dict.update(
@@ -271,6 +349,7 @@ class XLSXRenderer(BaseRenderer):
         for k, v in data.items():
             new_key = f"{parent_key}{key_sep}{k}" if parent_key else k
 
+            # Trap Promise instances for when _lazy is used
             if isinstance(v, Promise):
                 v = v.__class__._proxy____cast(v)
 
@@ -290,7 +369,6 @@ class XLSXRenderer(BaseRenderer):
         for header_key in self.combined_header_dict:
             if header_key == "row_color":
                 continue
-
             column_count += 1
             field = flattened_row.get(header_key)
 
@@ -327,6 +405,7 @@ class XLSXRenderer(BaseRenderer):
             "value": value,
             "field": field,
             "style": self.body_style,
+            # Basically using formatter of custom col as a custom mapping
             "mapping": self.custom_cols.get(key, {}).get("formatter")
             or self.custom_mappings.get(key),
             "cell_style": cell_style,
