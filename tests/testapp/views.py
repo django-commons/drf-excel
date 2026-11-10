@@ -217,3 +217,21 @@ class HyperlinkViewSet(
             return "https://example.com"
 
         return None
+
+
+class HyperlinkStreamingViewSet(
+    XLSXHyperlinkMixin,
+    XLSXFileMixin,
+    XLSXStreamingMixin,
+    ReadOnlyModelViewSet,
+):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "hyperlinks-streaming.xlsx"
+
+    def get_cell_hyperlink(self, row, column):
+        if column == "title":
+            return "https://example.com"
+
+        return None

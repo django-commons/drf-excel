@@ -8,6 +8,8 @@ from .testapp.views import (
     CustomColsViewSet,
     DynamicFieldViewSet,
     ExampleViewSet,
+    HyperlinkStreamingViewSet,
+    HyperlinkViewSet,
     NestedLabelsViewSet,
     NestedViewSet,
     RowColorViewSet,
@@ -55,6 +57,12 @@ router.register(
     r"specify-nested-parent-header",
     SpecifyNestedParentHeaderViewSet,
     basename="specify-nested-parent-header",
+)
+router.register(r"hyperlinks", HyperlinkViewSet, basename="hyperlinks")
+router.register(
+    r"hyperlinks-streaming",
+    HyperlinkStreamingViewSet,
+    basename="hyperlinks-streaming",
 )
 
 urlpatterns = router.urls

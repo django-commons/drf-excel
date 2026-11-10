@@ -10,8 +10,6 @@ from drf_excel.mixins import XLSXHyperlinkMixin
 from drf_excel.renderers import XLSXRenderer
 from drf_excel.utilities import XLSXStyle
 from tests.testapp.models import ExampleModel
-from tests.testapp.views import ExampleViewSet
-
 
 class HyperlinkSerializer(serializers.Serializer):
     title = serializers.CharField()
@@ -24,6 +22,7 @@ class HyperlinkView(XLSXHyperlinkMixin, GenericAPIView):
     def get_cell_hyperlink(self, row, column):
         if column == "website":
             return row.get("website")
+
         return None
 
 
@@ -66,23 +65,19 @@ class TestXLSXHyperlinkMixin:
 
     def test_get_cell_hyperlink(self):
         view = HyperlinkView()
-        assert (
-            view._get_cell_hyperlink(
-                {"website": "https://example.com"},
-                "website",
-            )
-            == "https://example.com"
-        )
+
+        assert view._get_cell_hyperlink(
+            {"website": "https://example.com"},
+            "website",
+        ) == "https://example.com"
 
     def test_get_cell_hyperlink_returns_none(self):
         view = HyperlinkView()
-        assert (
-            view._get_cell_hyperlink(
-                {"title": "Example"},
-                "title",
-            )
-            is None
-        )
+
+        assert view._get_cell_hyperlink(
+            {"title": "Example"},
+            "title",
+        ) is None
 
     def test_get_cell_hyperlink_rejects_invalid_type(self):
         class InvalidView(XLSXHyperlinkMixin):
@@ -126,25 +121,32 @@ def test_renderer_adds_hyperlinks(workbook_reader):
 
 
 @pytest.mark.django_db
-def test_streaming_export_adds_hyperlinks(workbook_reader, monkeypatch):
+def test_regular_export_adds_hyperlinks(workbook_reader):
     ExampleModel.objects.create(
         title="Example",
         description="Example description",
     )
 
-    def get_cell_hyperlink(self, row, column):
-        if column == "title":
-            return "https://example.com"
-        return None
+    response = APIClient().get("/hyperlinks/")
 
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "_get_cell_hyperlink",
-        get_cell_hyperlink,
-        raising=False,
+    assert response.status_code == 200
+    assert response.streaming is False
+
+    workbook = workbook_reader(response.content, read_only=False)
+    worksheet = workbook.active
+
+    assert worksheet["A2"].value == "Example"
+    assert worksheet["A2"].hyperlink.target == "https://example.com"
+
+
+@pytest.mark.django_db
+def test_streaming_export_adds_hyperlinks(workbook_reader):
+    ExampleModel.objects.create(
+        title="Example",
+        description="Example description",
     )
 
-    response = APIClient().get("/examples/export-xlsx/")
+    response = APIClient().get("/hyperlinks-streaming/export-xlsx/")
 
     assert response.status_code == 200
     assert response.streaming is True
