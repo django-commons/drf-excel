@@ -11,6 +11,7 @@ from drf_excel.renderers import XLSXRenderer
 from drf_excel.utilities import XLSXStyle
 from tests.testapp.models import ExampleModel
 
+
 class HyperlinkSerializer(serializers.Serializer):
     title = serializers.CharField()
     website = serializers.CharField()
@@ -66,18 +67,24 @@ class TestXLSXHyperlinkMixin:
     def test_get_cell_hyperlink(self):
         view = HyperlinkView()
 
-        assert view._get_cell_hyperlink(
-            {"website": "https://example.com"},
-            "website",
-        ) == "https://example.com"
+        assert (
+            view._get_cell_hyperlink(
+                {"website": "https://example.com"},
+                "website",
+            )
+            == "https://example.com"
+        )
 
     def test_get_cell_hyperlink_returns_none(self):
         view = HyperlinkView()
 
-        assert view._get_cell_hyperlink(
-            {"title": "Example"},
-            "title",
-        ) is None
+        assert (
+            view._get_cell_hyperlink(
+                {"title": "Example"},
+                "title",
+            )
+            is None
+        )
 
     def test_get_cell_hyperlink_rejects_invalid_type(self):
         class InvalidView(XLSXHyperlinkMixin):
