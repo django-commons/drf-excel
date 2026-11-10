@@ -126,11 +126,11 @@ class XLSXNumberField(XLSXField):
     def prep_cell(self, cell: Cell):
         super().prep_cell(cell)
 
-        if isinstance(self.drf_field, IntegerField) or (
-            not isinstance(self.drf_field, FloatField | DecimalField)
-            and isinstance(self.value, int)
-            and not isinstance(self.value, bool)
-        ):
+        if isinstance(self.drf_field, IntegerField):
+            cell.number_format = get_setting("INTEGER_FORMAT") or FORMAT_NUMBER
+        elif isinstance(self.drf_field, FloatField | DecimalField):
+            cell.number_format = get_setting("DECIMAL_FORMAT") or FORMAT_NUMBER_00
+        elif isinstance(self.value, int) and not isinstance(self.value, bool):
             cell.number_format = get_setting("INTEGER_FORMAT") or FORMAT_NUMBER
         else:
             cell.number_format = get_setting("DECIMAL_FORMAT") or FORMAT_NUMBER_00
@@ -183,9 +183,10 @@ class XLSXDateField(XLSXField):
                 return self._parse_date(value, "TIME_FORMAT", parse_time).replace(
                     tzinfo=None
                 )
-            elif isinstance(value, datetime.datetime) and value.tzinfo is not None:
-                return value.replace(tzinfo=None)
-            elif isinstance(value, datetime.time) and value.tzinfo is not None:
+            elif (
+                isinstance(value, datetime.datetime | datetime.time)
+                and value.tzinfo is not None
+            ):
                 return value.replace(tzinfo=None)
         except Exception:
             pass
@@ -195,20 +196,17 @@ class XLSXDateField(XLSXField):
     def prep_cell(self, cell: Cell):
         super().prep_cell(cell)
 
-        if isinstance(self.drf_field, DateTimeField) or (
-            not isinstance(self.drf_field, DateField | TimeField)
-            and isinstance(self.value, datetime.datetime)
-        ):
+        if isinstance(self.drf_field, DateTimeField):
             cell.number_format = get_setting("DATETIME_FORMAT") or FORMAT_DATE_DATETIME
-        elif isinstance(self.drf_field, DateField) or (
-            not isinstance(self.drf_field, DateTimeField | TimeField)
-            and isinstance(self.value, datetime.date)
-        ):
+        elif isinstance(self.drf_field, DateField):
             cell.number_format = get_setting("DATE_FORMAT") or FORMAT_DATE_YYYYMMDD2
-        elif isinstance(self.drf_field, TimeField) or (
-            not isinstance(self.drf_field, DateTimeField | DateField)
-            and isinstance(self.value, datetime.time)
-        ):
+        elif isinstance(self.drf_field, TimeField):
+            cell.number_format = get_setting("TIME_FORMAT") or FORMAT_DATE_TIME4
+        elif isinstance(self.value, datetime.datetime):
+            cell.number_format = get_setting("DATETIME_FORMAT") or FORMAT_DATE_DATETIME
+        elif isinstance(self.value, datetime.date):
+            cell.number_format = get_setting("DATE_FORMAT") or FORMAT_DATE_YYYYMMDD2
+        elif isinstance(self.value, datetime.time):
             cell.number_format = get_setting("TIME_FORMAT") or FORMAT_DATE_TIME4
 
 
