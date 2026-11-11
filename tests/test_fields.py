@@ -449,7 +449,7 @@ class TestXLSXDateField:
     def test_cell_datetime_with_generic_field(
         self, style: XLSXStyle, worksheet: Worksheet
     ):
-        now = dt.datetime(2026, 11, 8, 12, 30, tzinfo=dt.timezone.utc)
+        now = dt.datetime(2026, 11, 8, 12, 30, tzinfo=dt.UTC)
         f = XLSXDateField(
             key="timestamp",
             value=now,
