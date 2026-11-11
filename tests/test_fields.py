@@ -14,6 +14,8 @@ from rest_framework.fields import (
     FloatField,
     IntegerField,
     ListField,
+    ReadOnlyField,
+    SerializerMethodField,
     TimeField,
 )
 
@@ -216,6 +218,38 @@ class TestXLSXNumberField:
         assert cell.value == 35.5
         assert cell.number_format == "0.00"
 
+    def test_cell_integer_with_generic_field(
+        self, style: XLSXStyle, worksheet: Worksheet
+    ):
+        f = XLSXNumberField(
+            key="count",
+            value=42,
+            field=ReadOnlyField(),
+            style=style,
+            mapping="",
+            cell_style=style,
+        )
+        cell = f.cell(worksheet, 1, 1)
+        assert isinstance(cell, Cell)
+        assert cell.value == 42
+        assert cell.number_format == "0"
+
+    def test_cell_float_with_generic_field(
+        self, style: XLSXStyle, worksheet: Worksheet
+    ):
+        f = XLSXNumberField(
+            key="ratio",
+            value=3.14,
+            field=SerializerMethodField(),
+            style=style,
+            mapping="",
+            cell_style=style,
+        )
+        cell = f.cell(worksheet, 1, 1)
+        assert isinstance(cell, Cell)
+        assert cell.value == 3.14
+        assert cell.number_format == "0.00"
+
 
 class TestXLSXDateField:
     @pytest.mark.parametrize(
@@ -396,6 +430,53 @@ class TestXLSXDateField:
         assert isinstance(cell, Cell)
         assert cell.value == dt.time(9, 10, 11)
         assert cell.number_format == "hh - mm - ss"
+
+    def test_cell_date_with_generic_field(self, style: XLSXStyle, worksheet: Worksheet):
+        today = dt.date(2026, 11, 8)
+        f = XLSXDateField(
+            key="day",
+            value=today,
+            field=ReadOnlyField(),
+            style=style,
+            mapping="",
+            cell_style=style,
+        )
+        cell = f.cell(worksheet, 1, 1)
+        assert isinstance(cell, Cell)
+        assert cell.value == today
+        assert cell.number_format == "yyyy-mm-dd"
+
+    def test_cell_datetime_with_generic_field(
+        self, style: XLSXStyle, worksheet: Worksheet
+    ):
+        now = dt.datetime(2026, 11, 8, 12, 30, tzinfo=dt.UTC)
+        f = XLSXDateField(
+            key="timestamp",
+            value=now,
+            field=SerializerMethodField(),
+            style=style,
+            mapping="",
+            cell_style=style,
+        )
+        cell = f.cell(worksheet, 1, 1)
+        assert isinstance(cell, Cell)
+        assert cell.value == dt.datetime(2026, 11, 8, 12, 30)
+        assert cell.number_format == "yyyy-mm-dd h:mm:ss"
+
+    def test_cell_time_with_generic_field(self, style: XLSXStyle, worksheet: Worksheet):
+        current_time = dt.time(14, 15)
+        f = XLSXDateField(
+            key="time",
+            value=current_time,
+            field=None,
+            style=style,
+            mapping="",
+            cell_style=style,
+        )
+        cell = f.cell(worksheet, 1, 1)
+        assert isinstance(cell, Cell)
+        assert cell.value == current_time
+        assert cell.number_format == "h:mm:ss"
 
 
 class TestXLSXListField:
