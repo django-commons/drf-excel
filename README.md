@@ -42,6 +42,7 @@ REST_FRAMEWORK = {
 To avoid having a file streamed without a filename (which the browser will often default to the filename "download", with no extension), we need to use a mixin to override the `Content-Disposition` header. If no `filename` is provided, it will default to `export.xlsx`. For example:
 
 ```python
+from rest_framework.renderers import JSONRenderer
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from drf_excel.mixins import XLSXFileMixin
 from drf_excel.renderers import XLSXRenderer
