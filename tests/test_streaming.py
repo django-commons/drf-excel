@@ -91,7 +91,10 @@ class XLSXStreamingTests(TestCase):
             description="First description",
         )
 
-        response = self.client.get("/examples/?format=json")
+        response = self.client.get(
+            "/examples/",
+            HTTP_ACCEPT="application/json",
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.streaming)
