@@ -103,7 +103,7 @@ class XLSXStreamingTests(TestCase):
         self.assertFalse(response.streaming)
 
         self.assertEqual(
-            response.json(),
+            response.data,
             [
                 {
                     "title": "First",
