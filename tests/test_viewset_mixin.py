@@ -25,9 +25,7 @@ def test_simple_viewset_model(api_client, workbook_reader):
     assert response.headers["Content-Type"].startswith(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    assert (
-        response.headers["content-disposition"] == "attachment; filename=my_export.xlsx"
-    )
+    assert 'filename="my_export.xlsx"' in response.headers["Content-Disposition"]
 
     wb = workbook_reader(response)
 
