@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from django.test import TestCase
+from django.urls import reverse
 from openpyxl import load_workbook
 from rest_framework.test import APIClient
 
@@ -92,7 +93,7 @@ class XLSXStreamingTests(TestCase):
         )
 
         response = self.client.get(
-            "/examples/",
+            reverse("examplemodel-list"),
             HTTP_ACCEPT="application/json",
         )
 
