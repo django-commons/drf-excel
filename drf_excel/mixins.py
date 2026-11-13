@@ -7,7 +7,6 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.views import SheetView
-from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from drf_excel.renderers import XLSXRenderer
@@ -65,22 +64,6 @@ class XLSXFileMixin:
             *args,
             **kwargs,
         )
-
-
-class XLSXHyperlinkMixin:
-    def get_cell_hyperlink(self, row, column):
-        return None
-
-    def _get_cell_hyperlink(self, row, column):
-        hyperlink = self.get_cell_hyperlink(row, column)
-
-        if hyperlink is None:
-            return None
-
-        if not isinstance(hyperlink, str):
-            raise TypeError("get_cell_hyperlink() must return a string or None.")
-
-        return hyperlink or None
 
 
     def _configure_renderer(self, renderer, serializer):
@@ -308,3 +291,19 @@ class XLSXHyperlinkMixin:
             filename=filename,
             content_type=XLSXRenderer.media_type,
         )
+
+
+class XLSXHyperlinkMixin:
+    def get_cell_hyperlink(self, row, column):
+        return None
+
+    def _get_cell_hyperlink(self, row, column):
+        hyperlink = self.get_cell_hyperlink(row, column)
+
+        if hyperlink is None:
+            return None
+
+        if not isinstance(hyperlink, str):
+            raise TypeError("get_cell_hyperlink() must return a string or None.")
+
+        return hyperlink or None
