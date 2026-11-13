@@ -52,10 +52,12 @@ from .serializers import MyExampleSerializer
 class MyExampleViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     queryset = MyExampleModel.objects.all()
     serializer_class = MyExampleSerializer
-    renderer_classes = (XLSXRenderer,)
+    renderer_classes = (JSONRenderer, XLSXRenderer)
     filename = 'my_export.xlsx'
     pagination_class = None  # Only required if custom pagination is used
 ```
+
+Request `?format=xlsx` to download an XLSX file. Queryset-backed viewsets using `XLSXFileMixin` generate XLSX files incrementally by default, without loading the complete queryset into memory. Other negotiated formats, such as JSON, continue to use the regular DRF list behavior.
 
 The `XLSXFileMixin` also provides a `get_filename()` method which can be overridden, if you prefer to provide a filename programmatically instead of the `filename` attribute.
 
