@@ -14,6 +14,10 @@ from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
 
 class XLSXFileMixin:
+    """
+    Set the XLSX filename and stream queryset-backed XLSX list responses.
+    """
+
     filename = "export.xlsx"
     xlsx_iterator_chunk_size = 2000
 
@@ -64,7 +68,6 @@ class XLSXFileMixin:
             *args,
             **kwargs,
         )
-
 
     def _configure_renderer(self, renderer, serializer):
         """
