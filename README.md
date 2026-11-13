@@ -62,13 +62,45 @@ Request `?format=xlsx` to download an XLSX file. Queryset-backed viewsets using 
 
 The `XLSXFileMixin` also provides a `get_filename()` method which can be overridden, if you prefer to provide a filename programmatically instead of the `filename` attribute.
 
-## Upgrading to 2.0.0
+## Streaming XLSX exports
 
-To upgrade to `drf_excel` 2.0.0 from `drf_renderer_xlsx`, update your import paths:
+Queryset-backed viewsets using `XLSXFileMixin` stream XLSX exports by default. The existing `?format=xlsx` endpoint is unchanged; no separate streaming mixin or export action is required. Other negotiated formats, such as JSON, continue to use the regular DRF behavior.
 
-* `from drf_renderer_xlsx.mixins import XLSXFileMixin` becomes `from drf_excel.mixins import XLSXFileMixin`.
-* `drf_renderer_xlsx.renderers.XLSXRenderer` becomes `drf_excel.renderers.XLSXRenderer`.
-* `xlsx_date_format_mappings` has been removed in favor of `column_data_styles` which provides more flexibility
+The exporter applies `filter_queryset()` and iterates over the filtered queryset in batches. Pagination is not applied, so the export includes all matching records. The default iterator chunk size is 2,000 and can be configured on the viewset:
+
+```python
+class MyExampleViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
+    queryset = MyExampleModel.objects.all()
+    serializer_class = MyExampleSerializer
+    renderer_classes = (JSONRenderer, XLSXRenderer)
+    xlsx_iterator_chunk_size = 1000
+```
+
+Streaming uses OpenPyXL's write-only mode. Images configured in the XLSX header are not supported by this export path. Viewsets that override `list()` and return their own response continue to use their regular renderer behavior.
+
+## Adding hyperlinks
+
+To add hyperlinks to exported cells, include `XLSXHyperlinkMixin` and override `get_cell_hyperlink()`. The method receives the serialized row data and the field name, and must return a URL string or `None`.
+
+```python
+from drf_excel.mixins import XLSXFileMixin, XLSXHyperlinkMixin
+
+class MyExampleViewSet(
+    XLSXHyperlinkMixin,
+    XLSXFileMixin,
+    ReadOnlyModelViewSet,
+):
+    queryset = MyExampleModel.objects.all()
+    serializer_class = MyExampleSerializer
+    renderer_classes = (JSONRenderer, XLSXRenderer)
+
+    def get_cell_hyperlink(self, row, column):
+        if column == "title":
+            return row.get("website")
+        return None
+```
+
+Hyperlinks are supported by both the streaming queryset export and the regular XLSX renderer.
 
 ## Configuring Styles
 
