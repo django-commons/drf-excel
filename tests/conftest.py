@@ -1,9 +1,8 @@
 import io
 from collections.abc import Callable
 
-from django.http import HttpResponseBase
-
 import pytest
+from django.http import HttpResponseBase
 from openpyxl.reader.excel import load_workbook
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
