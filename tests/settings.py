@@ -16,7 +16,6 @@ ROOT_URLCONF = "tests.urls"
 
 INSTALLED_APPS = [
     "django.contrib.auth",
-    "django.contrib.admin",
     "django.contrib.contenttypes",
     "rest_framework",
     "tests.testapp",
