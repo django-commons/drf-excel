@@ -41,6 +41,7 @@ class XLSXField:
         style: XLSXStyle,
         mapping: str | Callable,
         cell_style: XLSXStyle,
+        hyperlink: str | None = None,
     ):
         self.key = key
         self.original_value = value
@@ -48,6 +49,7 @@ class XLSXField:
         self.style = style
         self.mapping = mapping
         self.cell_style = cell_style
+        self.hyperlink = hyperlink
         self.value = self.init_value(value)
 
     def init_value(self, value):
@@ -79,6 +81,9 @@ class XLSXField:
         if self.cell_style:
             set_cell_style(cell, self.cell_style)
 
+        if self.hyperlink:
+            cell.hyperlink = self.hyperlink
+
         return cell
 
     def write_only_cell(self, ws: Worksheet) -> Cell:
@@ -100,6 +105,9 @@ class XLSXField:
         # Provided cell style always has priority
         if self.cell_style:
             set_cell_style(cell, self.cell_style)
+
+        if self.hyperlink:
+            cell.hyperlink = self.hyperlink
 
         return cell
 

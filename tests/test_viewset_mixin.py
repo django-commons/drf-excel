@@ -19,18 +19,15 @@ def test_simple_viewset_model(api_client, workbook_reader):
     ExampleModel.objects.create(title="test 2", description="Another test")
     ExampleModel.objects.create(title="test 3", description="Testing this out")
 
-    response = api_client.get("/examples/")
+    response = api_client.get("/examples/?format=xlsx")
 
     assert response.status_code == 200
-    assert (
-        response.headers["Content-Type"]
-        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=utf-8"
+    assert response.headers["Content-Type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    assert (
-        response.headers["content-disposition"] == "attachment; filename=my_export.xlsx"
-    )
+    assert 'filename="my_export.xlsx"' in response.headers["Content-Disposition"]
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
 
     assert len(wb.worksheets) == 1
     sheet = wb.worksheets[0]
@@ -69,7 +66,7 @@ def test_all_fields_viewset(
     response = api_client.get("/all-fields/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
     assert len(rows) == 2
@@ -101,7 +98,7 @@ def test_secret_field_viewset(api_client, workbook_reader):
     response = api_client.get("/secret-field/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
     assert len(rows) == 2
@@ -116,7 +113,7 @@ def test_dynamic_field_viewset(api_client, workbook_reader):
     response = api_client.get("/dynamic-field/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
 
     header, data = list(sheet.rows)
@@ -135,7 +132,7 @@ def test_auto_filter_viewset(api_client, workbook_reader):
     assert response.status_code == 200
 
     # Note: auto_filter.ref is not available for read-only workbooks
-    wb = workbook_reader(response.content, read_only=False)
+    wb = workbook_reader(response, read_only=False)
     sheet = wb.worksheets[0]
 
     assert sheet.auto_filter.ref == "A1:B2"
@@ -146,7 +143,7 @@ def test_nested_serializer_viewset(api_client, workbook_reader):
     response = api_client.get("/nested/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
     assert len(rows) == 3
@@ -166,7 +163,7 @@ def test_nested_serializer_with_labels(api_client, workbook_reader):
     response = api_client.get("/nested-labels/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
 
@@ -179,7 +176,7 @@ def test_custom_cols_viewset(api_client, workbook_reader):
     response = api_client.get("/custom-cols/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
 
@@ -196,7 +193,7 @@ def test_column_titles_override(api_client, workbook_reader):
     response = api_client.get("/column-titles/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
 
@@ -211,7 +208,7 @@ def test_column_width_as_list(api_client, workbook_reader):
     response = api_client.get("/column-width-list/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content, read_only=False)
+    wb = workbook_reader(response, read_only=False)
     sheet = wb.worksheets[0]
 
     assert sheet.column_dimensions["A"].width == 10
@@ -223,7 +220,7 @@ def test_row_color(api_client, workbook_reader):
     response = api_client.get("/row-color/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content, read_only=False)
+    wb = workbook_reader(response, read_only=False)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
 
@@ -243,7 +240,7 @@ def test_use_labels_viewset(api_client, workbook_reader):
     response = api_client.get("/use-labels/")
     assert response.status_code == 200
 
-    wb = workbook_reader(response.content)
+    wb = workbook_reader(response)
     sheet = wb.worksheets[0]
     rows = list(sheet.rows)
 
@@ -260,7 +257,7 @@ class TestSpecifyHeaders:
             response = api_client.get(url)
             assert response.status_code == 200
 
-            wb = workbook_reader(response.content)
+            wb = workbook_reader(response)
             rows = list(wb.worksheets[0].rows)
             return (
                 [cell.value for cell in rows[0]],

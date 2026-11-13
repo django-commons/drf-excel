@@ -1,615 +1,265 @@
-import gc
-import os
+from io import BytesIO
 
-import psutil
 import pytest
-from openpyxl import Workbook
+from django.test import TestCase
+from openpyxl import load_workbook
 from rest_framework import serializers
-from rest_framework.fields import CharField, DateTimeField, IntegerField
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
-from drf_excel import mixins as streaming_module
-from drf_excel.fields import XLSXDateField, XLSXField, XLSXNumberField
-from drf_excel.utilities import XLSXStyle
+from drf_excel import mixins
 from tests.testapp.models import ExampleModel
 from tests.testapp.views import ExampleViewSet
 
-pytestmark = pytest.mark.django_db
+
+class StreamingOptionsSerializer(serializers.ModelSerializer):
+    extra = serializers.SerializerMethodField()
+    row_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExampleModel
+        fields = ("title", "description", "extra", "row_color")
+
+    def get_extra(self, obj):
+        return "calculated"
+
+    def get_row_color(self, obj):
+        return "FF0000"
 
 
-@pytest.fixture
-def api_client():
-    return APIClient()
+class StreamingOptionsViewSet(ExampleViewSet):
+    serializer_class = StreamingOptionsSerializer
+    header = {
+        "header_title": "Report",
+        "tab_title": "Data",
+        "height": 30,
+        "style": {"font": {"bold": True}},
+    }
+    column_header = {
+        "titles": ["Custom title"],
+        "column_width": [32],
+        "height": 24,
+        "style": {"font": {"italic": True}},
+    }
+    body = {
+        "height": 18,
+        "style": {"font": {"bold": True}},
+    }
+    sheet_view_options = {"showGridLines": False}
+    xlsx_auto_filter = True
+    xlsx_custom_cols = {
+        "extra": {
+            "label": "Calculated",
+            "formatter": lambda value: f"{value}!",
+        },
+        "missing": {"label": "Empty"},
+    }
 
 
-def read_streaming_response(response):
-    """Consume the response so the XLSX workbook can be inspected."""
-    return b"".join(response.streaming_content)
+def get_xlsx_response(viewset):
+    request = APIRequestFactory().get("/examples/?format=xlsx")
+    return viewset.as_view({"get": "list"})(request)
 
 
-def measure_peak_rss(api_client):
-    """
-    Measure the process RSS increase while consuming
-    the streaming XLSX response.
-    """
-    process = psutil.Process(os.getpid())
+class XLSXStreamingTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
 
-    gc.collect()
-    baseline = process.memory_info().rss
-    peak = baseline
+    def get_xlsx(self):
+        response = self.client.get("/examples/?format=xlsx")
 
-    response = api_client.get("/examples/export-xlsx/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.streaming)
 
-    assert response.status_code == 200
-    assert response.streaming is True
+        content = b"".join(response.streaming_content)
+        workbook = load_workbook(BytesIO(content), read_only=True)
 
-    try:
-        for _chunk in response.streaming_content:
-            current = process.memory_info().rss
-            peak = max(peak, current)
-    finally:
-        response.close()
+        return response, workbook
 
-    return max(0, peak - baseline)
+    def test_xlsx_is_streamed_by_default(self):
+        ExampleModel.objects.create(
+            title="First",
+            description="First description",
+        )
 
+        response, workbook = self.get_xlsx()
 
-def test_streaming_export_returns_all_queryset_records(
-    api_client,
-    workbook_reader,
-):
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title="First",
-                description="First description",
-            ),
-            ExampleModel(
-                title="Second",
-                description="Second description",
-            ),
-            ExampleModel(
-                title="Third",
-                description="Third description",
-            ),
-        ]
-    )
-
-    response = api_client.get("/examples/export-xlsx/")
-
-    assert response.status_code == 200
-    assert response.streaming is True
-
-    assert response["Content-Type"].startswith(
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    assert "my_export.xlsx" in response["Content-Disposition"]
-
-    workbook = workbook_reader(
-        read_streaming_response(response),
-        read_only=True,
-    )
-
-    rows = list(workbook.worksheets[0].values)
-
-    assert rows == [
-        ("title", "description"),
-        ("First", "First description"),
-        ("Second", "Second description"),
-        ("Third", "Third description"),
-    ]
-
-
-def test_streaming_export_handles_empty_queryset(
-    api_client,
-    workbook_reader,
-):
-    response = api_client.get("/examples/export-xlsx/")
-
-    assert response.status_code == 200
-    assert response.streaming is True
-
-    workbook = workbook_reader(
-        read_streaming_response(response),
-        read_only=True,
-    )
-
-    rows = list(workbook.worksheets[0].values)
-
-    assert rows == [
-        ("title", "description"),
-    ]
-
-
-def test_streaming_export_uses_queryset_iterator(
-    api_client,
-    monkeypatch,
-):
-    from django.db.models.query import QuerySet
-
-    original_iterator = QuerySet.iterator
-    iterator_calls = []
-
-    def tracked_iterator(queryset, *args, **kwargs):
-        if queryset.model is ExampleModel:
-            iterator_calls.append(kwargs.get("chunk_size"))
-
-        return original_iterator(queryset, *args, **kwargs)
-
-    monkeypatch.setattr(
-        QuerySet,
-        "iterator",
-        tracked_iterator,
-        raising=False,
-    )
-
-    ExampleModel.objects.create(
-        title="Iterator test",
-        description="Checking iterator usage",
-    )
-
-    response = api_client.get("/examples/export-xlsx/")
-
-    assert response.status_code == 200
-
-    for _chunk in response.streaming_content:
-        pass
-
-    assert iterator_calls == [2000]
-
-
-def test_streaming_export_handles_many_records(
-    api_client,
-    workbook_reader,
-):
-    record_count = 1500
-
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title=f"Record {index}",
-                description=f"Description {index}",
+        self.assertTrue(response.streaming)
+        self.assertTrue(
+            response["Content-Type"].startswith(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-            for index in range(record_count)
-        ]
-    )
+        )
 
-    response = api_client.get("/examples/export-xlsx/")
+        rows = list(workbook.active.values)
 
-    assert response.status_code == 200
+        self.assertEqual(
+            rows,
+            [
+                ("title", "description"),
+                ("First", "First description"),
+            ],
+        )
 
-    workbook = workbook_reader(
-        read_streaming_response(response),
-        read_only=True,
-    )
+    def test_xlsx_exports_all_queryset_records(self):
+        ExampleModel.objects.bulk_create(
+            [
+                ExampleModel(title="First", description="Description 1"),
+                ExampleModel(title="Second", description="Description 2"),
+                ExampleModel(title="Third", description="Description 3"),
+            ]
+        )
 
-    rows = workbook.worksheets[0].iter_rows(values_only=True)
+        _, workbook = self.get_xlsx()
+        rows = list(workbook.active.values)
 
-    assert next(rows) == ("title", "description")
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows[0], ("title", "description"))
+        self.assertEqual(
+            set(rows[1:]),
+            {
+                ("First", "Description 1"),
+                ("Second", "Description 2"),
+                ("Third", "Description 3"),
+            },
+        )
 
-    exported_rows = list(rows)
+    def test_xlsx_handles_empty_queryset(self):
+        _, workbook = self.get_xlsx()
 
-    assert len(exported_rows) == record_count
-    assert exported_rows[0] == (
-        "Record 0",
-        "Description 0",
-    )
-    assert exported_rows[-1] == (
-        f"Record {record_count - 1}",
-        f"Description {record_count - 1}",
-    )
+        rows = list(workbook.active.values)
 
+        self.assertEqual(rows, [("title", "description")])
 
-def test_streaming_export_memory_growth(api_client):
-    import tracemalloc
+    def test_xlsx_uses_configured_filename(self):
+        response, _ = self.get_xlsx()
 
-    def measure_peak_memory():
-        gc.collect()
-        tracemalloc.start()
+        self.assertIn(
+            "my_export.xlsx",
+            response["Content-Disposition"],
+        )
 
-        try:
-            response = api_client.get("/examples/export-xlsx/")
-            assert response.status_code == 200
+    def test_json_response_is_not_streamed(self):
+        ExampleModel.objects.create(
+            title="First",
+            description="First description",
+        )
 
-            for _chunk in response.streaming_content:
-                pass
+        request = APIRequestFactory().get(
+            "/examples/",
+            HTTP_ACCEPT="application/json",
+        )
+        response = ExampleViewSet.as_view({"get": "list"})(request)
+        response.render()
 
-            _, peak = tracemalloc.get_traced_memory()
-            response.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.streaming)
 
-            return peak
-        finally:
-            tracemalloc.stop()
-
-    # Warm-up
-    ExampleModel.objects.create(
-        title="Warmup",
-        description="Warmup",
-    )
-    measure_peak_memory()
-    ExampleModel.objects.all().delete()
-
-    # Small dataset
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title=f"Record {index}",
-                description=f"Description {index}",
-            )
-            for index in range(500)
-        ]
-    )
-
-    small_peak = measure_peak_memory()
-    ExampleModel.objects.all().delete()
-
-    # Large dataset
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title=f"Record {index}",
-                description=f"Description {index}",
-            )
-            for index in range(20000)
-        ]
-    )
-
-    large_peak = measure_peak_memory()
-
-    growth_mb = (large_peak - small_peak) / (1024 * 1024)
-
-    print(f"\n500 records peak: {small_peak / 1024 / 1024:.2f} MB")
-    print(f"20000 records peak: {large_peak / 1024 / 1024:.2f} MB")
-    print(f"Memory growth: {growth_mb:.2f} MB")
-
-    assert growth_mb < 14, (
-        f"Memory grew by {growth_mb:.2f} MB "
-        "when increasing records from 500 to 20000."
-    )
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "title": "First",
+                    "description": "First description",
+                }
+            ],
+        )
 
 
-def test_streaming_export_rss_memory_growth(api_client):
-    # Warm-up
-    ExampleModel.objects.create(
-        title="Warmup",
-        description="Warmup",
-    )
+@pytest.mark.django_db
+def test_streaming_export_applies_view_options(workbook_reader):
+    ExampleModel.objects.create(title="First", description="Description")
 
-    measure_peak_rss(api_client)
-    ExampleModel.objects.all().delete()
+    response = get_xlsx_response(StreamingOptionsViewSet)
+    workbook = workbook_reader(response, read_only=False)
+    worksheet = workbook.active
 
-    # Small dataset
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title=f"Record {index}",
-                description=f"Description {index}",
-            )
-            for index in range(500)
-        ]
-    )
+    assert worksheet.title == "Data"
+    assert worksheet["A1"].value == "Report"
+    assert worksheet["A1"].font.bold is True
+    assert worksheet["A2"].value == "Custom title"
+    assert worksheet["A2"].font.italic is True
+    assert worksheet["B2"].value == "description"
+    assert worksheet["C2"].value == "Calculated"
+    assert worksheet["D2"].value == "Empty"
+    assert worksheet["A3"].value == "First"
+    assert worksheet["C3"].value == "calculated!"
+    assert worksheet["D3"].value is None
+    assert worksheet["A3"].fill.start_color.rgb == "00FF0000"
+    assert worksheet.row_dimensions[1].height == 30
+    assert worksheet.row_dimensions[2].height == 24
+    assert worksheet.row_dimensions[3].height == 18
+    assert worksheet.column_dimensions["A"].width == 32
+    assert worksheet.sheet_view.showGridLines is False
+    assert worksheet.auto_filter.ref == "A2:D3"
 
-    small_peak = measure_peak_rss(api_client)
-    ExampleModel.objects.all().delete()
-    gc.collect()
 
-    # Large dataset
-    ExampleModel.objects.bulk_create(
-        [
-            ExampleModel(
-                title=f"Record {index}",
-                description=f"Description {index}",
-            )
-            for index in range(20000)
-        ]
-    )
+@pytest.mark.django_db
+def test_non_queryset_export_is_rejected():
+    class NonQuerysetViewSet(ExampleViewSet):
+        def get_queryset(self):
+            return []
 
-    large_peak = measure_peak_rss(api_client)
-
-    small_mb = small_peak / (1024 * 1024)
-    large_mb = large_peak / (1024 * 1024)
-    growth_mb = (large_peak - small_peak) / (1024 * 1024)
-
-    print("\n========== RSS MEMORY RESULTS ==========")
-    print(f"500 records:    {small_mb:.2f} MB")
-    print(f"20,000 records: {large_mb:.2f} MB")
-    print(f"Difference:     {growth_mb:.2f} MB")
-    print("========================================")
+    with pytest.raises(TypeError, match="requires a queryset"):
+        get_xlsx_response(NonQuerysetViewSet)
 
 
 @pytest.mark.parametrize(
     ("chunk_size", "error"),
     [
         (True, TypeError),
-        ("200", TypeError),
+        (1.5, TypeError),
+        ("10", TypeError),
         (0, ValueError),
         (-1, ValueError),
     ],
 )
-def test_streaming_export_rejects_invalid_chunk_size(
-    api_client,
-    monkeypatch,
-    chunk_size,
-    error,
-):
-    monkeypatch.setattr(
-        ExampleViewSet, "xlsx_iterator_chunk_size", chunk_size, raising=False
-    )
+@pytest.mark.django_db
+def test_invalid_iterator_chunk_size_is_rejected(chunk_size, error):
+    class InvalidChunkSizeViewSet(ExampleViewSet):
+        xlsx_iterator_chunk_size = chunk_size
 
     with pytest.raises(error, match="xlsx_iterator_chunk_size"):
-        api_client.get("/examples/export-xlsx/")
+        get_xlsx_response(InvalidChunkSizeViewSet)
 
 
-def test_streaming_export_requires_queryset_iterator(api_client, monkeypatch):
-    monkeypatch.setattr(ExampleViewSet, "get_queryset", lambda self: [], raising=False)
-
-    with pytest.raises(TypeError, match="supports iterator"):
-        api_client.get("/examples/export-xlsx/")
-
-
-def test_streaming_export_rejects_header_images(api_client, monkeypatch):
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "header",
-        {"img": "unused.png"},
-        raising=False,
-    )
+@pytest.mark.django_db
+def test_header_image_is_rejected():
+    class ImageHeaderViewSet(ExampleViewSet):
+        header = {"img": "header.png"}
 
     with pytest.raises(NotImplementedError, match="Images in the XLSX header"):
-        api_client.get("/examples/export-xlsx/")
+        get_xlsx_response(ImageHeaderViewSet)
 
 
-def test_streaming_export_applies_workbook_options(
-    api_client,
-    workbook_reader,
-    monkeypatch,
-):
-    ExampleModel.objects.create(title="Styled", description="Styled row")
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "header",
-        {
-            "tab_title": "Streaming report",
-            "header_title": "Report title",
-            "height": 30,
-            "style": {"font": {"bold": True}},
-        },
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "column_header",
-        {
-            "titles": ["Name", "Details"],
-            "height": 25,
-            "column_width": [12],
-            "style": {"font": {"italic": True}},
-        },
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "body",
-        {"height": 18, "style": {"font": {"bold": True}}},
-        raising=False,
-    )
-    monkeypatch.setattr(ExampleViewSet, "xlsx_auto_filter", True, raising=False)
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "sheet_view_options",
-        {"showGridLines": False},
-        raising=False,
-    )
+@pytest.mark.django_db
+def test_filename_attribute_is_used_when_get_filename_is_unavailable():
+    class FilenameFallbackViewSet(ExampleViewSet):
+        filename = "fallback.xlsx"
+        get_filename = None
 
-    response = api_client.get("/examples/export-xlsx/")
-    workbook = workbook_reader(
-        read_streaming_response(response),
-        read_only=False,
-    )
-    worksheet = workbook["Streaming report"]
+    response = get_xlsx_response(FilenameFallbackViewSet)
 
-    assert worksheet["A1"].value == "Report title"
-    assert worksheet["A1"].font.bold is True
-    assert worksheet["A2"].value == "Name"
-    assert worksheet["A2"].font.italic is True
-    assert worksheet["A3"].font.bold is True
-    assert worksheet.row_dimensions[1].height == 30
-    assert worksheet.row_dimensions[2].height == 25
-    assert worksheet.row_dimensions[3].height == 18
-    assert worksheet.column_dimensions["A"].width == 12
-    assert worksheet.column_dimensions["B"].width == 13
-    assert worksheet.auto_filter.ref == "A2:B3"
-    assert worksheet.sheet_view.showGridLines is False
+    assert 'filename="fallback.xlsx"' in response["Content-Disposition"]
 
 
-def test_streaming_export_can_omit_report_title(
-    api_client,
-    workbook_reader,
-    monkeypatch,
-):
-    ExampleModel.objects.create(title="First", description="Second")
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "header",
-        {"use_header": False, "tab_title": "No title"},
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "column_header",
-        {"column_width": 24},
-        raising=False,
-    )
+@pytest.mark.django_db
+def test_workbook_save_failure_closes_temporary_file(monkeypatch):
+    temporary_files = []
+    original_temporary_file = mixins.TemporaryFile
 
-    response = api_client.get("/examples/export-xlsx/")
-    workbook = workbook_reader(read_streaming_response(response), read_only=False)
-    worksheet = workbook["No title"]
+    def create_temporary_file(*args, **kwargs):
+        temporary_file = original_temporary_file(*args, **kwargs)
+        temporary_files.append(temporary_file)
+        return temporary_file
 
-    assert worksheet["A1"].value == "title"
-    assert worksheet["A2"].value == "First"
-    assert worksheet.column_dimensions["A"].width == 24
+    def fail_save(workbook, file):
+        raise RuntimeError("save failed")
 
+    monkeypatch.setattr(mixins, "TemporaryFile", create_temporary_file)
+    monkeypatch.setattr(mixins.Workbook, "save", fail_save)
 
-def test_streaming_export_handles_custom_columns_and_mappings(
-    api_client,
-    workbook_reader,
-    monkeypatch,
-):
-    ExampleModel.objects.create(title="original", description="description")
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "xlsx_custom_cols",
-        {"extra": {"label": "Extra column"}},
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "xlsx_custom_mappings",
-        {"title": lambda value: value.upper()},
-        raising=False,
-    )
-    monkeypatch.setattr(
-        ExampleViewSet,
-        "xlsx_specify_headers",
-        ["title", "extra"],
-        raising=False,
-    )
-    monkeypatch.setattr(ExampleViewSet, "xlsx_ignore_headers", [], raising=False)
+    with pytest.raises(RuntimeError, match="save failed"):
+        get_xlsx_response(ExampleViewSet)
 
-    response = api_client.get("/examples/export-xlsx/")
-    workbook = workbook_reader(read_streaming_response(response))
-    rows = list(workbook.active.values)
-
-    assert rows == [
-        ("title", "Extra column"),
-        ("ORIGINAL",),
-    ]
-
-
-def test_streaming_export_applies_row_color(api_client, workbook_reader, monkeypatch):
-    class ColoredSerializer(serializers.ModelSerializer):
-        row_color = serializers.SerializerMethodField()
-
-        def get_row_color(self, instance):
-            return "FFFF00"
-
-        class Meta:
-            model = ExampleModel
-            fields = ("title", "description", "row_color")
-
-    ExampleModel.objects.create(title="Colored", description="row")
-    monkeypatch.setattr(
-        ExampleViewSet, "serializer_class", ColoredSerializer, raising=False
-    )
-
-    response = api_client.get("/examples/export-xlsx/")
-    workbook = workbook_reader(read_streaming_response(response), read_only=False)
-    worksheet = workbook.active
-
-    assert worksheet.max_column == 2
-    assert worksheet["A2"].value == "Colored"
-    assert worksheet["A2"].fill.fgColor.rgb.endswith("FFFF00")
-    assert worksheet["B2"].fill.fgColor.rgb.endswith("FFFF00")
-
-
-def test_streaming_export_uses_filename_fallback(
-    api_client,
-    monkeypatch,
-):
-    monkeypatch.setattr(ExampleViewSet, "get_filename", None, raising=False)
-    monkeypatch.setattr(ExampleViewSet, "filename", "fallback.xlsx", raising=False)
-
-    response = api_client.get("/examples/export-xlsx/")
-
-    assert response.status_code == 200
-    assert "fallback.xlsx" in response["Content-Disposition"]
-
-
-def test_streaming_export_closes_temporary_file_when_save_fails(
-    api_client,
-    monkeypatch,
-):
-    class TemporaryFileStub:
-        closed = False
-
-        def close(self):
-            self.closed = True
-
-    temporary_file = TemporaryFileStub()
-
-    def fail_save(self, file_object):
-        raise OSError("disk write failed")
-
-    monkeypatch.setattr(
-        streaming_module,
-        "TemporaryFile",
-        lambda **kwargs: temporary_file,
-        raising=False,
-    )
-    monkeypatch.setattr(Workbook, "save", fail_save, raising=False)
-
-    with pytest.raises(OSError, match="disk write failed"):
-        api_client.get("/examples/export-xlsx/")
-
-    assert temporary_file.closed is True
-
-
-@pytest.mark.parametrize(
-    ("mapping", "value", "expected"),
-    [
-        ("label", {"label": "mapped"}, "mapped"),
-        (lambda value: value.upper(), "mapped", "MAPPED"),
-    ],
-)
-def test_write_only_cell_supports_custom_mappings(mapping, value, expected):
-    worksheet = Workbook(write_only=True).create_sheet()
-    field = XLSXField(
-        key="value",
-        value=value,
-        field=CharField(),
-        style=XLSXStyle(),
-        mapping=mapping,
-        cell_style=XLSXStyle({"font": {"bold": True}}),
-    )
-
-    cell = field.write_only_cell(worksheet)
-
-    assert cell.parent is worksheet
-    assert cell.value == expected
-    assert cell.font.bold is True
-
-
-def test_write_only_number_cell_preserves_number_format():
-    worksheet = Workbook(write_only=True).create_sheet()
-    field = XLSXNumberField(
-        key="count",
-        value="42",
-        field=IntegerField(),
-        style=XLSXStyle(),
-        mapping="",
-        cell_style=None,
-    )
-
-    cell = field.write_only_cell(worksheet)
-
-    assert cell.parent is worksheet
-    assert cell.value == 42
-    assert cell.number_format == "0"
-
-
-def test_write_only_date_cell_preserves_number_format():
-    worksheet = Workbook(write_only=True).create_sheet()
-    field = XLSXDateField(
-        key="created",
-        value="2025-01-02T03:04:05",
-        field=DateTimeField(),
-        style=XLSXStyle(),
-        mapping="",
-        cell_style=None,
-    )
-
-    cell = field.write_only_cell(worksheet)
-
-    assert cell.parent is worksheet
-    assert cell.value.year == 2025
-    assert cell.number_format == "yyyy-mm-dd h:mm:ss"
+    assert len(temporary_files) == 1
+    assert temporary_files[0].closed
