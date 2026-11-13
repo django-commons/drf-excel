@@ -15,24 +15,13 @@ from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
 
 class XLSXFileMixin:
-    """
-    Mixin which allows the override of the filename being
-    passed back to the user when the spreadsheet is downloaded.
-    """
-
     filename = "export.xlsx"
+    xlsx_iterator_chunk_size = 2000
 
     def get_filename(self, request=None, *args, **kwargs):
-        """
-        Returns a custom filename for the spreadsheet.
-        """
         return self.filename
 
     def finalize_response(self, request, response, *args, **kwargs):
-        """
-        Return the response with the proper content disposition and the customized
-        filename instead of the browser default (or lack thereof).
-        """
         response = super().finalize_response(request, response, *args, **kwargs)
         if (
             isinstance(response, Response)
@@ -43,6 +32,39 @@ class XLSXFileMixin:
                 f"attachment; filename={escape_uri_path(filename)}"
             )
         return response
+
+    def list(self, request, *args, **kwargs):
+        if request.accepted_renderer.format != "xlsx":
+            return super().list(request, *args, **kwargs)
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if not callable(getattr(queryset, "iterator", None)):
+            raise TypeError(
+                "XLSX streaming export requires a queryset "
+                "that supports iterator()."
+            )
+
+        chunk_size = self.xlsx_iterator_chunk_size
+
+        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int):
+            raise TypeError("xlsx_iterator_chunk_size must be a positive integer.")
+
+        if chunk_size <= 0:
+            raise ValueError("xlsx_iterator_chunk_size must be a positive integer.")
+
+        serializer = self.get_serializer()
+        renderer = XLSXRenderer()
+        self._configure_renderer(renderer, serializer)
+
+        return self._build_streaming_response(
+            request,
+            queryset,
+            renderer,
+            chunk_size,
+            *args,
+            **kwargs,
+        )
 
 
 class XLSXHyperlinkMixin:
@@ -60,59 +82,6 @@ class XLSXHyperlinkMixin:
 
         return hyperlink or None
 
-
-class XLSXStreamingMixin:
-    """
-    Adds an opt-in XLSX export action that processes queryset records
-    incrementally and writes worksheet rows in write-only mode.
-
-    The export includes all records returned by get_queryset() after
-    filter_queryset() is applied. Pagination is intentionally bypassed.
-    """
-
-    xlsx_iterator_chunk_size = 2000
-
-    @action(
-        detail=False,
-        methods=["get"],
-        url_path="export-xlsx",
-        url_name="export-xlsx",
-    )
-    def export_xlsx(self, request, *args, **kwargs):
-        """
-        Export the filtered queryset without materializing all records
-        or worksheet cells in memory.
-        """
-        queryset = self.filter_queryset(self.get_queryset())
-
-        if not callable(getattr(queryset, "iterator", None)):
-            raise TypeError(
-                "XLSX streaming export requires a queryset " "that supports iterator()."
-            )
-
-        chunk_size = self.xlsx_iterator_chunk_size
-
-        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int):
-            raise TypeError("xlsx_iterator_chunk_size must be a positive integer.")
-
-        if chunk_size <= 0:
-            raise ValueError("xlsx_iterator_chunk_size must be a positive integer.")
-
-        # Build serializer metadata once. Each model instance is serialized
-        # separately inside the iterator loop below.
-        serializer = self.get_serializer()
-
-        renderer = XLSXRenderer()
-        self._configure_renderer(renderer, serializer)
-
-        return self._build_streaming_response(
-            request,
-            queryset,
-            renderer,
-            chunk_size,
-            *args,
-            **kwargs,
-        )
 
     def _configure_renderer(self, renderer, serializer):
         """
