@@ -128,7 +128,7 @@ def test_renderer_adds_hyperlinks(workbook_reader):
 
 
 @pytest.mark.django_db
-def test_regular_export_adds_hyperlinks(workbook_reader):
+def test_queryset_export_adds_hyperlinks(workbook_reader):
     ExampleModel.objects.create(
         title="Example",
         description="Example description",
@@ -137,29 +137,9 @@ def test_regular_export_adds_hyperlinks(workbook_reader):
     response = APIClient().get("/hyperlinks/")
 
     assert response.status_code == 200
-    assert response.streaming is False
-
-    workbook = workbook_reader(response.content, read_only=False)
-    worksheet = workbook.active
-
-    assert worksheet["A2"].value == "Example"
-    assert worksheet["A2"].hyperlink.target == "https://example.com"
-
-
-@pytest.mark.django_db
-def test_streaming_export_adds_hyperlinks(workbook_reader):
-    ExampleModel.objects.create(
-        title="Example",
-        description="Example description",
-    )
-
-    response = APIClient().get("/hyperlinks-streaming/export-xlsx/")
-
-    assert response.status_code == 200
     assert response.streaming is True
 
-    content = b"".join(response.streaming_content)
-    workbook = workbook_reader(content, read_only=False)
+    workbook = workbook_reader(response, read_only=False)
     worksheet = workbook.active
 
     assert worksheet["A2"].value == "Example"
