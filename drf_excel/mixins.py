@@ -44,8 +44,7 @@ class XLSXFileMixin:
 
         if not callable(getattr(queryset, "iterator", None)):
             raise TypeError(
-                "XLSX streaming export requires a queryset "
-                "that supports iterator()."
+                "XLSX streaming export requires a queryset " "that supports iterator()."
             )
 
         chunk_size = self.xlsx_iterator_chunk_size
