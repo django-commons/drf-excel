@@ -1,3 +1,5 @@
+import uuid
+
 from django.utils.translation import gettext_lazy as _
 from PIL import Image
 from rest_framework import serializers
@@ -195,3 +197,43 @@ class TestXLSXRenderer:
         assert len(rows) == 2
         assert rows[0][0].value == "title"
         assert rows[1][0].value == "test"
+
+    def test_uuid_values(self, workbook_reader):
+        """
+        UUID objects should be written as strings rather than crashing
+        openpyxl with "Cannot convert UUID(...) to Excel".
+
+        https://github.com/django-commons/drf-excel/issues/24
+        """
+        uuid_value = uuid.UUID("12345678-1234-5678-1234-567812345678")
+
+        class UUIDSerializer(serializers.Serializer):
+            uuid_field = serializers.UUIDField()
+            read_only_uuid = serializers.ReadOnlyField()
+            method_uuid = serializers.SerializerMethodField()
+
+            def get_method_uuid(self, obj):
+                return obj["uuid_field"]
+
+        class UUIDView(MyBaseView):
+            serializer_class = UUIDSerializer
+
+            @staticmethod
+            def get_serializer(*args, **kwargs):
+                return UUIDSerializer()
+
+        data = UUIDSerializer(
+            {"uuid_field": uuid_value, "read_only_uuid": uuid_value}
+        ).data
+        # ReadOnlyField and SerializerMethodField pass the raw UUID through
+        assert isinstance(data["read_only_uuid"], uuid.UUID)
+        assert isinstance(data["method_uuid"], uuid.UUID)
+
+        result = self.renderer.render(
+            [data],
+            renderer_context={"view": UUIDView},
+        )
+        wb = workbook_reader(result)
+        sheet = wb.worksheets[0]
+        rows = list(sheet.rows)
+        assert [cell.value for cell in rows[1]] == [str(uuid_value)] * 3
