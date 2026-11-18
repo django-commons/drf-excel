@@ -1,5 +1,7 @@
+import datetime
 import json
 from collections.abc import Iterable, MutableMapping
+from decimal import Decimal
 from tempfile import TemporaryFile
 
 from django.utils.functional import Promise
@@ -18,6 +20,8 @@ from rest_framework.fields import (
     FloatField,
     IntegerField,
     ListField,
+    ReadOnlyField,
+    SerializerMethodField,
     TimeField,
 )
 from rest_framework.renderers import BaseRenderer
@@ -404,11 +408,25 @@ class XLSXRenderer(BaseRenderer):
             "cell_style": cell_style,
         }
 
-        if isinstance(field, BooleanField):
+        is_generic_field = (
+            field is None
+            or isinstance(field, SerializerMethodField | ReadOnlyField)
+            or type(field) is Field
+        )
+
+        if isinstance(field, BooleanField) or (
+            is_generic_field and isinstance(value, bool)
+        ):
             return XLSXBooleanField(boolean_display=self.boolean_display, **kwargs)
-        elif isinstance(field, IntegerField | FloatField | DecimalField):
+        elif isinstance(field, IntegerField | FloatField | DecimalField) or (
+            is_generic_field
+            and isinstance(value, int | float | Decimal)
+            and not isinstance(value, bool)
+        ):
             return XLSXNumberField(**kwargs)
-        elif isinstance(field, DateTimeField | DateField | TimeField):
+        elif isinstance(field, DateTimeField | DateField | TimeField) or (
+            is_generic_field and isinstance(value, datetime.date | datetime.time)
+        ):
             return XLSXDateField(**kwargs)
         elif (
             isinstance(field, ListField)
