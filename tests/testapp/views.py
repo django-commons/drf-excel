@@ -1,7 +1,11 @@
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
-from drf_excel.mixins import XLSXFileMixin, XLSXStreamingMixin
+from drf_excel.mixins import (
+    XLSXFileMixin,
+    XLSXHyperlinkMixin,
+)
 from drf_excel.renderers import XLSXRenderer
 
 from .models import AllFieldsModel, ExampleModel, SecretFieldModel
@@ -14,14 +18,10 @@ from .serializers import (
 )
 
 
-class ExampleViewSet(
-    XLSXFileMixin,
-    XLSXStreamingMixin,
-    ReadOnlyModelViewSet,
-):
+class ExampleViewSet(XLSXFileMixin, ReadOnlyModelViewSet):
     queryset = ExampleModel.objects.all()
     serializer_class = ExampleSerializer
-    renderer_classes = (XLSXRenderer,)
+    renderer_classes = (JSONRenderer, XLSXRenderer)
     filename = "my_export.xlsx"
 
 
@@ -196,3 +196,20 @@ class SpecifyNestedHeadersViewSet(NestedViewSet):
 class SpecifyNestedParentHeaderViewSet(NestedViewSet):
     # Nested serializer addressed by its own key.
     xlsx_specify_headers = ["author"]
+
+
+class HyperlinkViewSet(
+    XLSXHyperlinkMixin,
+    XLSXFileMixin,
+    ReadOnlyModelViewSet,
+):
+    queryset = ExampleModel.objects.all()
+    serializer_class = ExampleSerializer
+    renderer_classes = (XLSXRenderer,)
+    filename = "hyperlinks.xlsx"
+
+    def get_cell_hyperlink(self, row, column):
+        if column == "title":
+            return "https://example.com"
+
+        return None

@@ -50,6 +50,7 @@ class XLSXRenderer(BaseRenderer):
     custom_cols = None
     list_sep = ", "
     body_style = None
+    hyperlink_getter = None
     sheet_view_options = {}
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
@@ -68,6 +69,7 @@ class XLSXRenderer(BaseRenderer):
         results = data["results"] if "results" in data else data
 
         drf_view = renderer_context.get("view")
+        self.hyperlink_getter = getattr(drf_view, "_get_cell_hyperlink", None)
 
         # Take header and column_header params from view
         header = get_attribute(drf_view, "header", {})
@@ -369,9 +371,14 @@ class XLSXRenderer(BaseRenderer):
                 continue
             column_count += 1
             field = flattened_row.get(header_key)
-            field.cell(self.ws, row_count, column_count) if field else self.ws.cell(
-                row_count, column_count
-            )
+
+            if field:
+                if self.hyperlink_getter:
+                    field.hyperlink = self.hyperlink_getter(row, header_key)
+
+                field.cell(self.ws, row_count, column_count)
+            else:
+                self.ws.cell(row_count, column_count)
 
         self.ws.row_dimensions[row_count].height = body.get("height", 40)
 

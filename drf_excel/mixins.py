@@ -7,7 +7,6 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.views import SheetView
-from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from drf_excel.renderers import XLSXRenderer
@@ -16,23 +15,16 @@ from drf_excel.utilities import XLSXStyle, get_attribute, set_cell_style
 
 class XLSXFileMixin:
     """
-    Mixin which allows the override of the filename being
-    passed back to the user when the spreadsheet is downloaded.
+    Set the XLSX filename and stream queryset-backed XLSX list responses.
     """
 
     filename = "export.xlsx"
+    xlsx_iterator_chunk_size = 2000
 
     def get_filename(self, request=None, *args, **kwargs):
-        """
-        Returns a custom filename for the spreadsheet.
-        """
         return self.filename
 
     def finalize_response(self, request, response, *args, **kwargs):
-        """
-        Return the response with the proper content disposition and the customized
-        filename instead of the browser default (or lack thereof).
-        """
         response = super().finalize_response(request, response, *args, **kwargs)
         if (
             isinstance(response, Response)
@@ -44,29 +36,10 @@ class XLSXFileMixin:
             )
         return response
 
+    def list(self, request, *args, **kwargs):
+        if request.accepted_renderer.format != "xlsx":
+            return super().list(request, *args, **kwargs)
 
-class XLSXStreamingMixin:
-    """
-    Adds an opt-in XLSX export action that processes queryset records
-    incrementally and writes worksheet rows in write-only mode.
-
-    The export includes all records returned by get_queryset() after
-    filter_queryset() is applied. Pagination is intentionally bypassed.
-    """
-
-    xlsx_iterator_chunk_size = 2000
-
-    @action(
-        detail=False,
-        methods=["get"],
-        url_path="export-xlsx",
-        url_name="export-xlsx",
-    )
-    def export_xlsx(self, request, *args, **kwargs):
-        """
-        Export the filtered queryset without materializing all records
-        or worksheet cells in memory.
-        """
         queryset = self.filter_queryset(self.get_queryset())
 
         if not callable(getattr(queryset, "iterator", None)):
@@ -82,10 +55,7 @@ class XLSXStreamingMixin:
         if chunk_size <= 0:
             raise ValueError("xlsx_iterator_chunk_size must be a positive integer.")
 
-        # Build serializer metadata once. Each model instance is serialized
-        # separately inside the iterator loop below.
         serializer = self.get_serializer()
-
         renderer = XLSXRenderer()
         self._configure_renderer(renderer, serializer)
 
@@ -117,6 +87,7 @@ class XLSXStreamingMixin:
         renderer.fields_dict = renderer._serializer_fields(serializer)
 
         renderer.list_sep = getattr(renderer, "list_sep", ", ")
+        renderer.hyperlink_getter = getattr(self, "_get_cell_hyperlink", None)
 
         use_labels = getattr(self, "xlsx_use_labels", False)
 
@@ -266,6 +237,9 @@ class XLSXStreamingMixin:
                 field = flattened_row.get(key)
 
                 if field is not None:
+                    if renderer.hyperlink_getter:
+                        field.hyperlink = renderer.hyperlink_getter(row_data, key)
+
                     cell = field.write_only_cell(worksheet)
                 else:
                     cell = WriteOnlyCell(worksheet, value=None)
@@ -319,3 +293,19 @@ class XLSXStreamingMixin:
             filename=filename,
             content_type=XLSXRenderer.media_type,
         )
+
+
+class XLSXHyperlinkMixin:
+    def get_cell_hyperlink(self, row, column):
+        return None
+
+    def _get_cell_hyperlink(self, row, column):
+        hyperlink = self.get_cell_hyperlink(row, column)
+
+        if hyperlink is None:
+            return None
+
+        if not isinstance(hyperlink, str):
+            raise TypeError("get_cell_hyperlink() must return a string or None.")
+
+        return hyperlink or None
