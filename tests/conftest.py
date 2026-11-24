@@ -2,6 +2,7 @@ import io
 from collections.abc import Callable
 
 import pytest
+from django.http import HttpResponseBase
 from openpyxl.reader.excel import load_workbook
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -18,8 +19,17 @@ def worksheet(workbook: Workbook) -> Worksheet:
 
 
 @pytest.fixture
-def workbook_reader() -> Callable[[bytes | str, bool], Workbook]:
-    def reader_func(buffer: bytes | str, read_only: bool = True) -> Workbook:
+def workbook_reader() -> Callable[[bytes | str | HttpResponseBase, bool], Workbook]:
+    def reader_func(
+        buffer: bytes | str | HttpResponseBase,
+        read_only: bool = True,
+    ) -> Workbook:
+        if isinstance(buffer, HttpResponseBase):
+            if buffer.streaming:
+                buffer = b"".join(buffer.streaming_content)
+            else:
+                buffer = buffer.content
+
         io_buffer = io.BytesIO(buffer)
         return load_workbook(io_buffer, read_only=read_only)
 
